@@ -29,6 +29,11 @@ CLASS z2ui5_cl_core_handler DEFINITION
     METHODS main_end.
 
   PRIVATE SECTION.
+    METHODS error_2_result
+      IMPORTING
+        i_error       TYPE REF TO cx_root
+      RETURNING
+        VALUE(result) TYPE z2ui5_if_core_types=>ty_s_http_res.
 ENDCLASS.
 
 
@@ -43,39 +48,39 @@ CLASS z2ui5_cl_core_handler IMPLEMENTATION.
 
   METHOD main.
 
-    main_begin( ).
-    DO.
-      IF main_process( ).
-        EXIT.
-      ENDIF.
-    ENDDO.
+    TRY.
+        main_begin( ).
+        DO.
+          IF main_process( ).
+            EXIT.
+          ENDIF.
+        ENDDO.
 
-    result = VALUE #( body       = mv_response
-                      s_stateful = ms_response-s_front-params-s_stateful
-    ).
+        result = VALUE #( body       = mv_response
+                          s_stateful = ms_response-s_front-params-s_stateful ).
+
+      CATCH cx_root INTO DATA(x).
+        result = error_2_result( x ).
+    ENDTRY.
 
   ENDMETHOD.
 
   METHOD main_begin.
-    TRY.
 
-        DATA(lo_json_mapper) = NEW z2ui5_cl_core_srv_json( ).
-        ms_request = lo_json_mapper->request_json_to_abap( mv_request_json ).
+    DATA(lo_json_mapper) = NEW z2ui5_cl_core_srv_json( ).
+    ms_request = lo_json_mapper->request_json_to_abap( mv_request_json ).
 
-        IF ms_request-s_front-id IS NOT INITIAL.
-          mo_action = mo_action->factory_by_frontend( ).
+    IF ms_request-s_front-id IS NOT INITIAL.
+      mo_action = mo_action->factory_by_frontend( ).
 
-        ELSEIF ms_request-s_control-app_start IS NOT INITIAL.
-          NEW z2ui5_cl_core_srv_draft( )->cleanup( ).
-          mo_action = mo_action->factory_first_start( ).
+    ELSEIF ms_request-s_control-app_start IS NOT INITIAL.
+      NEW z2ui5_cl_core_srv_draft( )->cleanup( ).
+      mo_action = mo_action->factory_first_start( ).
 
-        ELSE.
-          mo_action = mo_action->factory_system_startup( ).
-        ENDIF.
+    ELSE.
+      mo_action = mo_action->factory_system_startup( ).
+    ENDIF.
 
-      CATCH cx_root INTO DATA(x).
-        ASSERT x->get_text( ) = 1.
-    ENDTRY.
   ENDMETHOD.
 
   METHOD main_end.
@@ -117,32 +122,73 @@ CLASS z2ui5_cl_core_handler IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD main_process.
-    TRY.
 
-        DATA(li_client) = NEW z2ui5_cl_core_client( mo_action ).
-        DATA(li_app)    = CAST z2ui5_if_app( mo_action->mo_app->mo_app ).
+    DATA(li_client) = NEW z2ui5_cl_core_client( mo_action ).
+    DATA(li_app)    = CAST z2ui5_if_app( mo_action->mo_app->mo_app ).
 
-        IF li_app->check_sticky = abap_false.
-          ROLLBACK WORK.
-        ENDIF.
-        li_app->main( li_client ).
-        IF li_app->check_sticky = abap_false.
-          ROLLBACK WORK.
-        ENDIF.
+    IF li_app->check_sticky = abap_false.
+      ROLLBACK WORK.
+    ENDIF.
+    li_app->main( li_client ).
+    IF li_app->check_sticky = abap_false.
+      ROLLBACK WORK.
+    ENDIF.
 
-        IF mo_action->ms_next-o_app_leave IS NOT INITIAL.
-          mo_action = mo_action->factory_stack_leave( ).
+    IF mo_action->ms_next-o_app_leave IS NOT INITIAL.
+      mo_action = mo_action->factory_stack_leave( ).
 
-        ELSEIF mo_action->ms_next-o_app_call IS NOT INITIAL.
-          mo_action = mo_action->factory_stack_call( ).
+    ELSEIF mo_action->ms_next-o_app_call IS NOT INITIAL.
+      mo_action = mo_action->factory_stack_call( ).
 
-        ELSE.
-          main_end( ).
-          check_go_client = abap_true.
-        ENDIF.
+    ELSE.
+      main_end( ).
+      check_go_client = abap_true.
+    ENDIF.
 
-      CATCH cx_root INTO DATA(x).
-        ASSERT x->get_text( ) = 1.
-    ENDTRY.
   ENDMETHOD.
+
+
+  METHOD error_2_result.
+
+    result-status_reason = i_error->get_text( ).
+    result-status_code   = 500.
+
+    TRY.
+        DATA(util_error) = CAST z2ui5_cx_util_error( i_error ).
+        IF util_error->ms_error-status_code IS NOT INITIAL.
+          result-status_code = util_error->ms_error-status_code.
+        ENDIF.
+      CATCH cx_sy_move_cast_error.
+    ENDTRY.
+
+    result-body = |<!DOCTYPE html> | &&
+                  |<html lang="en"> | &&
+                  |<head> | &&
+                  |    <style> | &&
+                  |        body \{ | &&
+                  |            background-color: #222; | &&
+                  |            font-family: 'Arial', sans-serif; | &&
+                  |            text-align: center; | &&
+                  |            color: #ddd; | &&
+                  |        \} | &&
+                  |        h1 \{ | &&
+                  |            color: #0077ff; | &&
+                  |            text-transform: uppercase; | &&
+                  |        \} | &&
+                  |        .error-link \{ | &&
+                  |            background-color: #0077ff; | &&
+                  |            color: #fff; | &&
+                  |            padding: 10px 20px; | &&
+                  |            text-decoration: none; | &&
+                  |            border-radius: 5px; | &&
+                  |        \} | &&
+                  |    </style> | &&
+                  |</head> | &&
+                  |<body> | &
+                  |    <h1>{ i_error->get_text( ) } </h1> | &&
+                  |</body> | &&
+                  |</html> |.
+
+  ENDMETHOD.
+
 ENDCLASS.

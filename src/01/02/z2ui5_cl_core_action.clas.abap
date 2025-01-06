@@ -122,8 +122,9 @@ CLASS z2ui5_cl_core_action IMPLEMENTATION.
       CATCH cx_root INTO DATA(x).
         RAISE EXCEPTION TYPE z2ui5_cx_util_error
           EXPORTING
-            val      = |App with name { mo_http_post->ms_request-s_control-app_start } not found...|
-            previous = x.
+            val         = |App with name { mo_http_post->ms_request-s_control-app_start } not found...|
+            previous    = x
+            status_code = 404.
     ENDTRY.
 
   ENDMETHOD.

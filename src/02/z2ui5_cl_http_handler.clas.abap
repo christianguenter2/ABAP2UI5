@@ -225,8 +225,13 @@ CLASS z2ui5_cl_http_handler IMPLEMENTATION.
     mo_server->set_cdata( ms_res-body ).
     mo_server->set_header_field( n = `cache-control`
                                  v = `no-cache` ).
-    mo_server->set_status( code   = 200
-                           reason = `success` ).
+    IF ms_res-status_code IS NOT INITIAL.
+      mo_server->set_status( code   = ms_res-status_code
+                             reason = ms_res-status_reason ).
+    ELSE.
+      mo_server->set_status( code   = 200
+                             reason = `success` ).
+    ENDIF.
 
     " transform cookie to header based contextid handling
     IF ms_res-s_stateful-switched = abap_true.
@@ -261,7 +266,8 @@ CLASS z2ui5_cl_http_handler IMPLEMENTATION.
     result = lo_post->main( ).
 
     TRY.
-        IF lo_post IS BOUND.
+        IF lo_post IS BOUND
+        AND lo_post->mo_action->mo_app->mo_app IS BOUND.
           DATA(li_app) = CAST z2ui5_if_app( lo_post->mo_action->mo_app->mo_app ).
           IF li_app->check_sticky = abap_true.
             so_sticky_handler = lo_post.
