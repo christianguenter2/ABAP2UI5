@@ -73,6 +73,10 @@ CLASS z2ui5_cl_core_srv_model DEFINITION
         VALUE(result) TYPE z2ui5_if_core_types=>ty_s_attri.
 
   PRIVATE SECTION.
+    METHODS delta_apply_to_table
+      IMPORTING
+        io_val_front TYPE REF TO z2ui5_if_ajson
+        iv_name      TYPE string.
 ENDCLASS.
 
 
@@ -93,6 +97,12 @@ CLASS z2ui5_cl_core_srv_model IMPLEMENTATION.
 
           DATA(lo_val_front) = model->slice( lr_attri->name_client ).
           IF lo_val_front IS NOT BOUND.
+            CONTINUE.
+          ENDIF.
+
+          IF lo_val_front->exists( '/__delta' ) = abap_true.
+            delta_apply_to_table( io_val_front = lo_val_front
+                                  iv_name      = lr_attri->name ).
             CONTINUE.
           ENDIF.
 
@@ -662,6 +672,47 @@ CLASS z2ui5_cl_core_srv_model IMPLEMENTATION.
         lr_attri->name_client = lt_attri[ name = lv_name ]-name_client.
         lr_attri->view        = lt_attri[ name = lv_name ]-view.
       ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD delta_apply_to_table.
+
+    TRY.
+        DATA(lr_ref_d) = attri_get_val_ref( iv_name ).
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+
+    FIELD-SYMBOLS <delta_tab> TYPE STANDARD TABLE.
+    ASSIGN lr_ref_d->* TO <delta_tab>.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+    DATA(lo_delta) = io_val_front->slice( '/__delta' ).
+    DATA(lt_idx) = lo_delta->members( '/' ).
+    LOOP AT lt_idx INTO DATA(lv_idx_str).
+      DATA(lv_tabix) = CONV i( lv_idx_str ) + 1.
+      FIELD-SYMBOLS <delta_row> TYPE any.
+      READ TABLE <delta_tab> INDEX lv_tabix ASSIGNING <delta_row>.
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+      DATA(lo_row_d) = lo_delta->slice( |/{ lv_idx_str }| ).
+      DATA(lt_fld) = lo_row_d->members( '/' ).
+      LOOP AT lt_fld INTO DATA(lv_fld).
+        FIELD-SYMBOLS <comp> TYPE any.
+        ASSIGN COMPONENT lv_fld OF STRUCTURE <delta_row> TO <comp>.
+        IF sy-subrc <> 0.
+          CONTINUE.
+        ENDIF.
+        IF lo_row_d->get_node_type( |/{ lv_fld }| ) = z2ui5_if_ajson_types=>node_type-boolean.
+          <comp> = lo_row_d->get_boolean( |/{ lv_fld }| ).
+        ELSE.
+          <comp> = lo_row_d->get_string( |/{ lv_fld }| ).
+        ENDIF.
+      ENDLOOP.
     ENDLOOP.
 
   ENDMETHOD.
