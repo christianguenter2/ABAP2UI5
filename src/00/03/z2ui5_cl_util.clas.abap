@@ -495,6 +495,94 @@ CLASS z2ui5_cl_util DEFINITION
       RETURNING
         VALUE(result) TYPE abap_bool.
 
+    CLASS-METHODS c_contains
+      IMPORTING
+        val           TYPE clike
+        sub           TYPE clike
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    CLASS-METHODS c_starts_with
+      IMPORTING
+        val           TYPE clike
+        prefix        TYPE clike
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    CLASS-METHODS c_ends_with
+      IMPORTING
+        val           TYPE clike
+        suffix        TYPE clike
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    CLASS-METHODS c_split
+      IMPORTING
+        val           TYPE clike
+        sep           TYPE clike
+      RETURNING
+        VALUE(result) TYPE string_table.
+
+    CLASS-METHODS c_join
+      IMPORTING
+        tab           TYPE string_table
+        sep           TYPE clike DEFAULT ``
+      RETURNING
+        VALUE(result) TYPE string.
+
+    CLASS-METHODS rtti_check_table
+      IMPORTING
+        val           TYPE any
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    CLASS-METHODS rtti_check_structure
+      IMPORTING
+        val           TYPE any
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    CLASS-METHODS rtti_check_numeric
+      IMPORTING
+        val           TYPE any
+      RETURNING
+        VALUE(result) TYPE abap_bool.
+
+    CLASS-METHODS time_add_seconds
+      IMPORTING
+        !time         TYPE timestampl
+        !seconds      TYPE i
+      RETURNING
+        VALUE(result) TYPE timestampl.
+
+    CLASS-METHODS time_get_stampl_by_date_time
+      IMPORTING
+        !date         TYPE d
+        !time         TYPE t
+      RETURNING
+        VALUE(result) TYPE timestampl.
+
+    CLASS-METHODS time_diff_seconds
+      IMPORTING
+        !time_from    TYPE timestampl
+        !time_to      TYPE timestampl
+      RETURNING
+        VALUE(result) TYPE i.
+
+    CLASS-METHODS conv_string_to_date
+      IMPORTING
+        val           TYPE clike
+        format        TYPE clike DEFAULT `YYYY-MM-DD`
+      RETURNING
+        VALUE(result) TYPE d.
+
+    CLASS-METHODS conv_date_to_string
+      IMPORTING
+        val           TYPE d
+        format        TYPE clike DEFAULT `YYYY-MM-DD`
+      RETURNING
+        VALUE(result) TYPE string.
+
   PROTECTED SECTION.
 
   PRIVATE SECTION.
@@ -721,6 +809,7 @@ CLASS z2ui5_cl_util IMPLEMENTATION.
       WHEN OTHERS.
         IF lv_value CP `...`.
           SPLIT lv_value AT `...` INTO result-low result-high.
+          result-sign   = `I`.
           result-option = `BT`.
         ELSE.
           result = VALUE #( sign   = `I`
@@ -1040,13 +1129,11 @@ CLASS z2ui5_cl_util IMPLEMENTATION.
         DATA(incl_comps) = rtti_get_t_attri_by_include( lr_comp->type ).
 
         LOOP AT incl_comps REFERENCE INTO DATA(lr_incl_comp).
-          lr_incl_comp->name = lr_incl_comp->name.
           APPEND lr_incl_comp->* TO result.
         ENDLOOP.
 
       ELSE.
 
-        lr_comp->name = lr_comp->name.
         APPEND lr_comp->* TO result.
 
       ENDIF.
@@ -1066,27 +1153,30 @@ CLASS z2ui5_cl_util IMPLEMENTATION.
 
   METHOD rtti_get_t_attri_by_any.
 
+    DATA lo_struct TYPE REF TO cl_abap_structdescr.
+    DATA lo_type   TYPE REF TO cl_abap_typedescr.
+
     TRY.
-        DATA(lo_type) = cl_abap_typedescr=>describe_by_data( val ).
-        DATA(lo_struct) = CAST cl_abap_structdescr( lo_type ).
+        lo_type = cl_abap_typedescr=>describe_by_data( val ).
+        IF lo_type->kind = cl_abap_typedescr=>kind_ref.
+          lo_type = cl_abap_typedescr=>describe_by_data_ref( val ).
+        ENDIF.
       CATCH cx_root.
         TRY.
-            DATA(lo_tab) = CAST cl_abap_tabledescr( lo_type ).
-            lo_struct = CAST cl_abap_structdescr( lo_tab->get_table_line_type( ) ).
+            lo_type = cl_abap_typedescr=>describe_by_data_ref( val ).
           CATCH cx_root.
-            TRY.
-                DATA(lo_ref) = cl_abap_typedescr=>describe_by_data_ref( val ).
-                lo_struct = CAST cl_abap_structdescr( lo_ref ).
-              CATCH cx_root.
-                TRY.
-                    lo_tab = CAST cl_abap_tabledescr( lo_ref ).
-                    lo_struct = CAST cl_abap_structdescr( lo_tab->get_table_line_type( ) ).
-                  CATCH cx_root.
-                    lo_struct ?= cl_abap_structdescr=>describe_by_name( val ).
-                ENDTRY.
-            ENDTRY.
+            lo_type = cl_abap_structdescr=>describe_by_name( val ).
         ENDTRY.
     ENDTRY.
+
+    CASE lo_type->kind.
+      WHEN cl_abap_typedescr=>kind_struct.
+        lo_struct = CAST #( lo_type ).
+      WHEN cl_abap_typedescr=>kind_table.
+        lo_struct = CAST #( CAST cl_abap_tabledescr( lo_type )->get_table_line_type( ) ).
+      WHEN OTHERS.
+        lo_struct ?= lo_type.
+    ENDCASE.
 
     DATA(comps) = lo_struct->get_components( ).
 
@@ -1514,17 +1604,8 @@ CLASS z2ui5_cl_util IMPLEMENTATION.
     FIELD-SYMBOLS <row_out> TYPE any.
 
     LOOP AT val ASSIGNING <row_in>.
-
-      IF lines( tab ) = 0.
-        DATA(lv_lines) = 1.
-      ELSE.
-        lv_lines = lines( tab ).
-      ENDIF.
-
-      INSERT INITIAL LINE INTO tab ASSIGNING <row_out> INDEX lv_lines.
-      CLEAR: <row_out>.
+      APPEND INITIAL LINE TO tab ASSIGNING <row_out>.
       MOVE-CORRESPONDING <row_in> TO <row_out>.
-
     ENDLOOP.
 
   ENDMETHOD.
@@ -1558,10 +1639,38 @@ CLASS z2ui5_cl_util IMPLEMENTATION.
 
   METHOD itab_filter_by_t_range.
 
+    DATA ref TYPE REF TO data.
+
+    LOOP AT tab REFERENCE INTO ref.
+      LOOP AT val INTO DATA(ls_filter).
+
+        IF ls_filter-t_range IS INITIAL.
+          CONTINUE.
+        ENDIF.
+
+        ASSIGN ref->(ls_filter-name) TO FIELD-SYMBOL(<field>).
+        IF sy-subrc <> 0.
+          CONTINUE.
+        ENDIF.
+        IF <field> NOT IN ls_filter-t_range.
+          DELETE tab.
+          EXIT.
+        ENDIF.
+
+      ENDLOOP.
+    ENDLOOP.
+
   ENDMETHOD.
 
 
   METHOD filter_get_data_by_multi.
+
+    LOOP AT val INTO DATA(ls_filter).
+      IF ls_filter-t_range IS NOT INITIAL
+        OR ls_filter-t_token IS NOT INITIAL.
+        INSERT ls_filter INTO TABLE result.
+      ENDIF.
+    ENDLOOP.
 
   ENDMETHOD.
 
@@ -1690,6 +1799,200 @@ CLASS z2ui5_cl_util IMPLEMENTATION.
       v3         = v3
       v4         = v4 ).
     result = msg_get( ls_msg ).
+
+  ENDMETHOD.
+
+
+  METHOD c_contains.
+
+    result = xsdbool( CONV string( val ) CS sub ).
+
+  ENDMETHOD.
+
+
+  METHOD c_starts_with.
+
+    DATA(lv_val) = CONV string( val ).
+    DATA(lv_prefix) = CONV string( prefix ).
+    DATA(lv_len) = strlen( lv_prefix ).
+
+    IF strlen( lv_val ) < lv_len.
+      result = abap_false.
+      RETURN.
+    ENDIF.
+
+    result = xsdbool( lv_val(lv_len) = lv_prefix ).
+
+  ENDMETHOD.
+
+
+  METHOD c_ends_with.
+
+    DATA(lv_val) = CONV string( val ).
+    DATA(lv_suffix) = CONV string( suffix ).
+    DATA(lv_len_suffix) = strlen( lv_suffix ).
+    DATA(lv_len_val) = strlen( lv_val ).
+
+    IF lv_len_val < lv_len_suffix.
+      result = abap_false.
+      RETURN.
+    ENDIF.
+
+    DATA(lv_off) = lv_len_val - lv_len_suffix.
+    result = xsdbool( lv_val+lv_off(lv_len_suffix) = lv_suffix ).
+
+  ENDMETHOD.
+
+
+  METHOD c_split.
+
+    SPLIT val AT sep INTO TABLE result.
+
+  ENDMETHOD.
+
+
+  METHOD c_join.
+
+    LOOP AT tab INTO DATA(lv_line).
+      IF sy-tabix > 1.
+        result = result && sep.
+      ENDIF.
+      result = result && lv_line.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD rtti_check_table.
+
+    DATA(lv_type_kind) = cl_abap_datadescr=>get_data_type_kind( val ).
+    result = xsdbool( lv_type_kind = cl_abap_typedescr=>typekind_table ).
+
+  ENDMETHOD.
+
+
+  METHOD rtti_check_structure.
+
+    TRY.
+        DATA(lo_type) = cl_abap_typedescr=>describe_by_data( val ).
+        result = xsdbool( lo_type->kind = cl_abap_typedescr=>kind_struct ).
+      CATCH cx_root.
+        result = abap_false.
+    ENDTRY.
+
+  ENDMETHOD.
+
+
+  METHOD rtti_check_numeric.
+
+    DATA(lv_type_kind) = cl_abap_datadescr=>get_data_type_kind( val ).
+    CASE lv_type_kind.
+      WHEN cl_abap_typedescr=>typekind_int
+          OR cl_abap_typedescr=>typekind_int1
+          OR cl_abap_typedescr=>typekind_int2
+          OR cl_abap_typedescr=>typekind_packed
+          OR cl_abap_typedescr=>typekind_float
+          OR cl_abap_typedescr=>typekind_decfloat
+          OR cl_abap_typedescr=>typekind_decfloat16
+          OR cl_abap_typedescr=>typekind_decfloat34
+          OR cl_abap_typedescr=>typekind_num.
+        result = abap_true.
+    ENDCASE.
+
+  ENDMETHOD.
+
+
+  METHOD time_add_seconds.
+
+    result = cl_abap_tstmp=>add( tstmp = time
+                                 secs  = seconds ).
+
+  ENDMETHOD.
+
+
+  METHOD time_get_stampl_by_date_time.
+
+    DATA(ls_sy) = z2ui5_cl_util=>context_get_sy( ).
+    CONVERT DATE date TIME time INTO TIME STAMP result TIME ZONE ls_sy-zonlo.
+
+  ENDMETHOD.
+
+
+  METHOD time_diff_seconds.
+
+    DATA(lv_diff) = cl_abap_tstmp=>subtract( tstmp1 = time_to
+                                              tstmp2 = time_from ).
+    result = lv_diff.
+
+  ENDMETHOD.
+
+
+  METHOD conv_string_to_date.
+
+    DATA(lv_val) = CONV string( val ).
+    DATA(lv_fmt) = CONV string( format ).
+    DATA(lv_yyyy_off) = find( val = lv_fmt sub = `YYYY` ).
+    DATA(lv_mm_off)   = find( val = lv_fmt sub = `MM` ).
+    DATA(lv_dd_off)   = find( val = lv_fmt sub = `DD` ).
+
+    DATA(lv_clean) = ``.
+    DATA(lv_i) = 0.
+    WHILE lv_i < strlen( lv_val ).
+      DATA(lv_c) = lv_val+lv_i(1).
+      IF lv_c >= `0` AND lv_c <= `9`.
+        lv_clean = lv_clean && lv_c.
+      ENDIF.
+      lv_i = lv_i + 1.
+    ENDWHILE.
+
+    DATA(lv_fmt_clean) = ``.
+    lv_i = 0.
+    WHILE lv_i < strlen( lv_fmt ).
+      lv_c = lv_fmt+lv_i(1).
+      IF lv_c = `Y` OR lv_c = `M` OR lv_c = `D`.
+        lv_fmt_clean = lv_fmt_clean && lv_c.
+      ENDIF.
+      lv_i = lv_i + 1.
+    ENDWHILE.
+
+    DATA(lv_year)  = ``.
+    DATA(lv_month) = ``.
+    DATA(lv_day)   = ``.
+
+    DATA(lv_pos) = 0.
+    lv_i = 0.
+    WHILE lv_i < strlen( lv_fmt_clean ).
+      lv_c = lv_fmt_clean+lv_i(1).
+      CASE lv_c.
+        WHEN `Y`.
+          lv_year = lv_year && lv_clean+lv_pos(1).
+        WHEN `M`.
+          lv_month = lv_month && lv_clean+lv_pos(1).
+        WHEN `D`.
+          lv_day = lv_day && lv_clean+lv_pos(1).
+      ENDCASE.
+      lv_pos = lv_pos + 1.
+      lv_i = lv_i + 1.
+    ENDWHILE.
+
+    result = lv_year && lv_month && lv_day.
+
+  ENDMETHOD.
+
+
+  METHOD conv_date_to_string.
+
+    DATA(lv_fmt) = CONV string( format ).
+    DATA(lv_date) = CONV string( val ).
+
+    DATA(lv_year)  = lv_date(4).
+    DATA(lv_month) = lv_date+4(2).
+    DATA(lv_day)   = lv_date+6(2).
+
+    result = lv_fmt.
+    REPLACE `YYYY` IN result WITH lv_year.
+    REPLACE `MM`   IN result WITH lv_month.
+    REPLACE `DD`   IN result WITH lv_day.
 
   ENDMETHOD.
 ENDCLASS.
