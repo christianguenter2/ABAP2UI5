@@ -138,22 +138,24 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `        oElement.applyFocusInfo(oFocus);` && |\n| &&
              `      } catch (e) { }` && |\n| &&
              `    },` && |\n| &&
+             `    onAfterRendering() {` && |\n| &&
+             `      if (!this._pendingFocus) return;` && |\n| &&
+             `      this._pendingFocus = false;` && |\n| &&
+             `      var oElement = z2ui5.oView.byId(this.getProperty("focusId"));` && |\n| &&
+             `      if (!oElement) return;` && |\n| &&
+             `      var oFocus = oElement.getFocusInfo();` && |\n| &&
+             `      oFocus.selectionStart = parseInt(this.getProperty("selectionStart"));` && |\n| &&
+             `      oFocus.selectionEnd = parseInt(this.getProperty("selectionEnd"));` && |\n| &&
+             `      oElement.applyFocusInfo(oFocus);` && |\n| &&
+             `    },` && |\n| &&
              `    renderer(oRm, oControl) {` && |\n| &&
-             `      if (!oControl.getProperty("setUpdate")) {` && |\n| &&
-             `        return;` && |\n| &&
-             `      }` && |\n| &&
+             `      oRm.openStart("span", oControl);` && |\n| &&
+             `      oRm.addStyle("display", "none");` && |\n| &&
+             `      oRm.openEnd();` && |\n| &&
+             `      oRm.close("span");` && |\n| &&
+             `      if (!oControl.getProperty("setUpdate")) return;` && |\n| &&
              `      oControl.setProperty("setUpdate", false);` && |\n| &&
-             `      setTimeout((oControl) => {` && |\n| &&
-             `        var oElement = z2ui5.oView.byId(oControl.getProperty("focusId"));` && |\n| &&
-             `        if (!oElement){` && |\n| &&
-             `          return` && |\n| &&
-             `        }` && |\n| &&
-             `        var oFocus = oElement.getFocusInfo();` && |\n| &&
-             `        oFocus.selectionStart = parseInt(oControl.getProperty("selectionStart"));` && |\n| &&
-             `        oFocus.selectionEnd = parseInt(oControl.getProperty("selectionEnd"));` && |\n| &&
-             `        oElement.applyFocusInfo(oFocus);` && |\n| &&
-             `      }` && |\n| &&
-             `        , 100, oControl);` && |\n| &&
+             `      oControl._pendingFocus = true;` && |\n| &&
              `    }` && |\n| &&
              `  });` && |\n| &&
              `}` && |\n| &&
@@ -253,11 +255,20 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `      z2ui5.onBeforeRoundtrip.push(this.setBackend.bind(this));` && |\n| &&
              `    },` && |\n| &&
              `` && |\n| &&
+             `    onAfterRendering() {` && |\n| &&
+             `      if (!this._pendingTreeState) return;` && |\n| &&
+             `      this._pendingTreeState = false;` && |\n| &&
+             `      const id = this.getProperty("tree_id");` && |\n| &&
+             `      z2ui5.oView.byId(id).getBinding('items').setTreeState(z2ui5.treeState);` && |\n| &&
+             `    },` && |\n| &&
+             `` && |\n| &&
              `    renderer(oRm, oControl) {` && |\n| &&
+             `      oRm.openStart("span", oControl);` && |\n| &&
+             `      oRm.addStyle("display", "none");` && |\n| &&
+             `      oRm.openEnd();` && |\n| &&
+             `      oRm.close("span");` && |\n| &&
              `      if (!z2ui5.treeState) return;` && |\n| &&
-             `      setTimeout((id) => {` && |\n| &&
-             `        z2ui5.oView.byId(id).getBinding('items').setTreeState(z2ui5.treeState);` && |\n| &&
-             `      }, 100, oControl.getProperty("tree_id"));` && |\n| &&
+             `      oControl._pendingTreeState = true;` && |\n| &&
              `    }` && |\n| &&
              `  });` && |\n| &&
              `});` && |\n| &&
@@ -407,6 +418,8 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `    init() { },` && |\n| &&
              `` && |\n| &&
              `    onAfterRendering() {` && |\n| &&
+             |\n|.
+    result = result &&
              `    },` && |\n| &&
              `` && |\n| &&
              `    async renderer(_, oControl) {` && |\n| &&
@@ -418,8 +431,6 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `      oControl.setProperty("device_tablet", oDevice.system.tablet);` && |\n| &&
              `      oControl.setProperty("device_combi", oDevice.system.combi);` && |\n| &&
              `      oControl.setProperty("device_height", oDevice.resize.height);` && |\n| &&
-             |\n|.
-    result = result &&
              `      oControl.setProperty("device_width", oDevice.resize.width);` && |\n| &&
              `      oControl.setProperty("device_os", oDevice.os.name);` && |\n| &&
              `      oControl.setProperty("device_browser", oDevice.browser.name);` && |\n| &&
@@ -809,6 +820,8 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `    },` && |\n| &&
              `    renderer(oRm, oControl) {` && |\n| &&
              `      z2ui5.onAfterRendering.push(oControl.setControl.bind(oControl));` && |\n| &&
+             |\n|.
+    result = result &&
              `    },` && |\n| &&
              `    setControl() {` && |\n| &&
              `      let table = z2ui5.oView.byId(this.getProperty("MultiInputId"));` && |\n| &&
@@ -820,8 +833,6 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `        }` && |\n| &&
              `      }` && |\n| &&
              `      if (!table) {` && |\n| &&
-             |\n|.
-    result = result &&
              `        return;` && |\n| &&
              `      }` && |\n| &&
              `      if (this.getProperty("checkInit") == true) {` && |\n| &&
@@ -1052,9 +1063,7 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `        });` && |\n| &&
              `      }` && |\n| &&
              `` && |\n| &&
-             `      this._oScanDialog.open();` && |\n| &&
-             `` && |\n| &&
-             `      setTimeout(function () {` && |\n| &&
+             `      this._oScanDialog.attachEventOnce("afterOpen", function () {` && |\n| &&
              `        var video = document.querySelector('#zvideo');` && |\n| &&
              `        if (navigator.mediaDevices.getUserMedia) {` && |\n| &&
              `          const facingMode = this.getProperty("facingMode");` && |\n| &&
@@ -1076,7 +1085,8 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `              console.log("Something went wrong! " + error);` && |\n| &&
              `            });` && |\n| &&
              `        }` && |\n| &&
-             `      }.bind(this), 300);` && |\n| &&
+             `      }.bind(this));` && |\n| &&
+             `      this._oScanDialog.open();` && |\n| &&
              `` && |\n| &&
              `    },` && |\n| &&
              `` && |\n| &&
@@ -1157,13 +1167,9 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `      ;` && |\n| &&
              `    },` && |\n| &&
              `` && |\n| &&
-             `    setFilter() {` && |\n| &&
-             `      try {` && |\n| &&
-             `        setTimeout((aFilters) => {` && |\n| &&
-             `          let id = this.getProperty("tableId");` && |\n| &&
-             `          let oTable = z2ui5.oView.byId(id);` && |\n| &&
-             `          oTable.getBinding().filter(aFilters);` && |\n| &&
-             `          var opSymbols = {` && |\n| &&
+             `    _applyFilters(oTable, aFilters) {` && |\n| &&
+             `      oTable.getBinding().filter(aFilters);` && |\n| &&
+             `      var opSymbols = {` && |\n| &&
              `  EQ: "",` && |\n| &&
              `  NE: "!",` && |\n| &&
              `  LT: "<",` && |\n| &&
@@ -1208,9 +1214,26 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `    }` && |\n| &&
              `  });` && |\n| &&
              `});` && |\n| &&
+             `    },` && |\n| &&
              `` && |\n| &&
+             `    setFilter() {` && |\n| &&
+             `      try {` && |\n| &&
+             `        const aFilters = this.aFilters;` && |\n| &&
+             `        let oTable = z2ui5.oView.byId(this.getProperty("tableId"));` && |\n| &&
+             `        if (!oTable) return;` && |\n| &&
+             `        if (oTable.getDomRef()) {` && |\n| &&
+             |\n|.
+    result = result &&
+             `          this._applyFilters(oTable, aFilters);` && |\n| &&
+             `        } else {` && |\n| &&
+             `          const delegate = {` && |\n| &&
+             `            onAfterRendering: () => {` && |\n| &&
+             `              oTable.removeEventDelegate(delegate);` && |\n| &&
+             `              this._applyFilters(oTable, aFilters);` && |\n| &&
+             `            }` && |\n| &&
+             `          };` && |\n| &&
+             `          oTable.addEventDelegate(delegate);` && |\n| &&
              `        }` && |\n| &&
-             `          , 100, this.aFilters);` && |\n| &&
              `      } catch (e) { }` && |\n| &&
              `      ;` && |\n| &&
              `    },` && |\n| &&
@@ -1222,25 +1245,35 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `  } catch (e) {}` && |\n| &&
              `},` && |\n| &&
              `` && |\n| &&
-             |\n|.
-    result = result &&
+             `_applySorters(oTable, aSorters) {` && |\n| &&
+             `  oTable.getBinding().sort(aSorters);` && |\n| &&
+             `  aSorters.forEach(function(srt, idx) {` && |\n| &&
+             `    oTable.getColumns().forEach(function(oCol) {` && |\n| &&
+             `      if (oCol.getSortProperty && oCol.getSortProperty() === srt.sPath) {` && |\n| &&
+             `        oCol.setSorted(true);` && |\n| &&
+             `        oCol.setSortOrder(srt.bDescending ? "Descending" : "Ascending");` && |\n| &&
+             `        if (oCol.setSortIndex) oCol.setSortIndex(idx);` && |\n| &&
+             `      }` && |\n| &&
+             `    });` && |\n| &&
+             `  });` && |\n| &&
+             `},` && |\n| &&
+             `` && |\n| &&
              `setSort() {` && |\n| &&
              `  try {` && |\n| &&
-             `    setTimeout((aSorters) => {` && |\n| &&
-             `      let id = this.getProperty("tableId");` && |\n| &&
-             `      let oTable = z2ui5.oView.byId(id);` && |\n| &&
-             `      oTable.getBinding().sort(aSorters);` && |\n| &&
-             `` && |\n| &&
-             `      aSorters.forEach(function(srt, idx) {` && |\n| &&
-             `        oTable.getColumns().forEach(function(oCol) {` && |\n| &&
-             `          if (oCol.getSortProperty && oCol.getSortProperty() === srt.sPath) {` && |\n| &&
-             `            oCol.setSorted(true);` && |\n| &&
-             `            oCol.setSortOrder(srt.bDescending ? "Descending" : "Ascending");` && |\n| &&
-             `            if (oCol.setSortIndex) oCol.setSortIndex(idx);` && |\n| &&
-             `          }` && |\n| &&
-             `        });` && |\n| &&
-             `      });` && |\n| &&
-             `    }, 100, this.aSorters);` && |\n| &&
+             `    const aSorters = this.aSorters;` && |\n| &&
+             `    let oTable = z2ui5.oView.byId(this.getProperty("tableId"));` && |\n| &&
+             `    if (!oTable) return;` && |\n| &&
+             `    if (oTable.getDomRef()) {` && |\n| &&
+             `      this._applySorters(oTable, aSorters);` && |\n| &&
+             `    } else {` && |\n| &&
+             `      const delegate = {` && |\n| &&
+             `        onAfterRendering: () => {` && |\n| &&
+             `          oTable.removeEventDelegate(delegate);` && |\n| &&
+             `          this._applySorters(oTable, aSorters);` && |\n| &&
+             `        }` && |\n| &&
+             `      };` && |\n| &&
+             `      oTable.addEventDelegate(delegate);` && |\n| &&
+             `    }` && |\n| &&
              `  } catch (e) {}` && |\n| &&
              `},` && |\n| &&
              `    renderer(oRM, oControl) { }` && |\n| &&
