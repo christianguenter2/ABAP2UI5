@@ -280,20 +280,29 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `` && |\n| &&
              `    setBackend() {` && |\n| &&
              `      const items = this.getProperty("items");` && |\n| &&
+             `      if (!items) return;` && |\n| &&
              `` && |\n| &&
-             `      if (items) {` && |\n| &&
-             `        items.forEach(item => {` && |\n| &&
+             `      const bindingInfo = this.getBindingInfo("items");` && |\n| &&
+             `      const bindingPath = bindingInfo?.parts?.[0]?.path || bindingInfo?.path;` && |\n| &&
+             `` && |\n| &&
+             `      items.forEach((item, index) => {` && |\n| &&
+             `        let scrollTop = 0;` && |\n| &&
+             `        try {` && |\n| &&
+             `          const scrollDelegate = z2ui5.oView.byId(item.N).getScrollDelegate();` && |\n| &&
+             `          scrollTop = scrollDelegate ? scrollDelegate.getScrollTop() : 0;` && |\n| &&
+             `        } catch {` && |\n| &&
              `          try {` && |\n| &&
-             `            const scrollDelegate = z2ui5.oView.byId(item.N).getScrollDelegate();` && |\n| &&
-             `            item.V = scrollDelegate ? scrollDelegate.getScrollTop() : 0;` && |\n| &&
-             `          } catch {` && |\n| &&
-             `            try {` && |\n| &&
-             `              const element = document.getElementById(``${z2ui5.oView.byId(item.ID).getId()}-inner``);` && |\n| &&
-             `              item.V = element ? element.scrollTop : 0;` && |\n| &&
-             `            } catch { }` && |\n| &&
+             `            const element = document.getElementById(``${z2ui5.oView.byId(item.ID).getId()}-inner``);` && |\n| &&
+             `            scrollTop = element ? element.scrollTop : 0;` && |\n| &&
+             `          } catch { }` && |\n| &&
+             `        }` && |\n| &&
+             `        if (item.V !== scrollTop) {` && |\n| &&
+             `          item.V = scrollTop;` && |\n| &&
+             `          if (bindingPath && z2ui5.xxChangedPaths) {` && |\n| &&
+             `            z2ui5.xxChangedPaths.add(``${bindingPath}/${index}/V``);` && |\n| &&
              `          }` && |\n| &&
-             `        });` && |\n| &&
-             `      }` && |\n| &&
+             `        }` && |\n| &&
+             `      });` && |\n| &&
              `    },` && |\n| &&
              `` && |\n| &&
              `    init() {` && |\n| &&
@@ -409,6 +418,8 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `          type: "string",` && |\n| &&
              `          defaultValue: ""` && |\n| &&
              `        },` && |\n| &&
+             |\n|.
+    result = result &&
              `        latitude: {` && |\n| &&
              `          type: "string",` && |\n| &&
              `          defaultValue: ""` && |\n| &&
@@ -418,8 +429,6 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `          defaultValue: ""` && |\n| &&
              `        },` && |\n| &&
              `        accuracy: {` && |\n| &&
-             |\n|.
-    result = result &&
              `          type: "string",` && |\n| &&
              `          defaultValue: ""` && |\n| &&
              `        },` && |\n| &&
@@ -811,6 +820,8 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `}` && |\n| &&
              `);` && |\n| &&
              `` && |\n| &&
+             |\n|.
+    result = result &&
              `sap.ui.define("z2ui5/SmartMultiInputExt", ["sap/ui/core/Control", "sap/m/Token", "sap/ui/core/Core", "sap/ui/core/Element"], (Control) => {` && |\n| &&
              `  "use strict";` && |\n| &&
              `` && |\n| &&
@@ -820,8 +831,6 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `        multiInputId: {` && |\n| &&
              `          type: "String"` && |\n| &&
              `        },` && |\n| &&
-             |\n|.
-    result = result &&
              `        addedTokens: {` && |\n| &&
              `          type: "object"` && |\n| &&
              `        },` && |\n| &&
@@ -1213,6 +1222,8 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `  } catch (e) {}` && |\n| &&
              `},` && |\n| &&
              `    renderer(oRM, oControl) { }` && |\n| &&
+             |\n|.
+    result = result &&
              `  });` && |\n| &&
              `}` && |\n| &&
              `);` && |\n| &&
@@ -1222,8 +1233,6 @@ CLASS z2ui5_cl_app_app_js IMPLEMENTATION.
              `  return {` && |\n| &&
              `    DateCreateObject: (s) => new Date(s),` && |\n| &&
              `    //  DateAbapTimestampToDate: (sTimestamp) => new sap.gantt.misc.Format.abapTimestampToDate(sTimestamp), commented for UI5 2.x compatibility` && |\n| &&
-             |\n|.
-    result = result &&
              `    DateAbapDateToDateObject: (d) => new Date(d.slice(0, 4), parseInt(d.slice(4, 6)) - 1, d.slice(6, 8)),` && |\n| &&
              `    DateAbapDateTimeToDateObject: (d, t = '000000') => new Date(d.slice(0, 4), parseInt(d.slice(4, 6)) - 1, d.slice(6, 8), t.slice(0, 2), t.slice(2, 4), t.slice(4, 6)),` && |\n| &&
              `  };` && |\n| &&
