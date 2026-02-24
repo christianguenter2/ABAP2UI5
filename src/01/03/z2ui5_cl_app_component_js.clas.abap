@@ -27,7 +27,7 @@ CLASS z2ui5_cl_app_component_js IMPLEMENTATION.
              `                "sap.ui.core.IAsyncContentCreation"` && |\n| &&
              `            ]` && |\n| &&
              `        },` && |\n| &&
-             `        async init() {` && |\n| &&
+             `        init() {` && |\n| &&
              `` && |\n| &&
              `            if (typeof z2ui5 !== 'undefined') {` && |\n| &&
              `                z2ui5.oConfig = {};` && |\n| &&
@@ -50,6 +50,7 @@ CLASS z2ui5_cl_app_component_js IMPLEMENTATION.
              `` && |\n| &&
              `            z2ui5.oConfig.ComponentData = this.getComponentData();` && |\n| &&
              `` && |\n| &&
+             `            (async () => {` && |\n| &&
              `            try {` && |\n| &&
              `                z2ui5.oLaunchpadService = await this.getService("ShellUIService");` && |\n| &&
              `            } catch (e) { }` && |\n| &&
@@ -60,11 +61,13 @@ CLASS z2ui5_cl_app_component_js IMPLEMENTATION.
              `                buildTimestamp: oVersionInfo.buildTimestamp,` && |\n| &&
              `                gav: oVersionInfo.gav,` && |\n| &&
              `            }` && |\n| &&
+             `            })();` && |\n| &&
              `` && |\n| &&
+             `            this._boundUnload = this._onUnload.bind(this);` && |\n| &&
              `            if (/iPad|iPhone/.test(navigator.platform)) {` && |\n| &&
-             `                window.addEventListener("pagehide", this.__pagehide.bind(this));` && |\n| &&
+             `                window.addEventListener("pagehide", this._boundUnload);` && |\n| &&
              `            } else {` && |\n| &&
-             `                window.addEventListener("beforeunload", this.__beforeunload.bind(this));` && |\n| &&
+             `                window.addEventListener("beforeunload", this._boundUnload);` && |\n| &&
              `            }` && |\n| &&
              `` && |\n| &&
              `            document.addEventListener("keydown", function (zEvent) {` && |\n| &&
@@ -92,12 +95,12 @@ CLASS z2ui5_cl_app_component_js IMPLEMENTATION.
              `` && |\n| &&
              `        },` && |\n| &&
              `` && |\n| &&
-             `        __beforeunload: function () {` && |\n| &&
-             `            window.removeEventListener("__beforeunload", this.__beforeunload.bind(this));` && |\n| &&
-             `            this.destroy();` && |\n| &&
-             `        },` && |\n| &&
-             `        __pagehide: function () {` && |\n| &&
-             `            window.removeEventListener("__pagehide", this.__pagehide.bind(this));` && |\n| &&
+             `        _onUnload: function () {` && |\n| &&
+             `            if (/iPad|iPhone/.test(navigator.platform)) {` && |\n| &&
+             `                window.removeEventListener("pagehide", this._boundUnload);` && |\n| &&
+             `            } else {` && |\n| &&
+             `                window.removeEventListener("beforeunload", this._boundUnload);` && |\n| &&
+             `            }` && |\n| &&
              `            this.destroy();` && |\n| &&
              `        },` && |\n| &&
              `` && |\n| &&
