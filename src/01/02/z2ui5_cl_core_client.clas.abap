@@ -13,6 +13,20 @@ CLASS z2ui5_cl_core_client DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    DATA mo_srv_bind  TYPE REF TO z2ui5_cl_core_srv_bind.
+    DATA mo_srv_event TYPE REF TO z2ui5_cl_core_srv_event.
+
+    METHODS nav_app_set_id
+      IMPORTING
+        app           TYPE REF TO z2ui5_if_app
+      RETURNING
+        VALUE(result) TYPE string.
+
+    METHODS get_msg_title
+      IMPORTING
+        type          TYPE string
+      RETURNING
+        VALUE(result) TYPE string.
 ENDCLASS.
 
 
@@ -21,6 +35,8 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
   METHOD constructor.
 
     mo_action = action.
+    mo_srv_bind = NEW #( mo_action->mo_app ).
+    mo_srv_event = NEW #( ).
 
   ENDMETHOD.
 
@@ -102,6 +118,16 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD get_msg_title.
+
+    result = SWITCH #( type
+                       WHEN `E` THEN `Error`
+                       WHEN `S` THEN `Success`
+                       WHEN `W` THEN `Warning`
+                       ELSE `Information` ).
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_client~message_box_display.
 
     IF z2ui5_cl_util=>rtti_check_clike( text ) = abap_false.
@@ -111,25 +137,17 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
 
         DATA(lv_type) = z2ui5_cl_util=>ui5_get_msg_type( lt_msg[ 1 ]-type ).
         lv_type = to_lower( lv_type ).
-        DATA(lv_title) = SWITCH #( lt_msg[ 1 ]-type
-                                   WHEN `E` THEN `Error`
-                                   WHEN `S` THEN `Success`
-                                   WHEN `W` THEN `Warning`
-                                   ELSE `Information` ).
+        DATA(lv_title) = get_msg_title( lt_msg[ 1 ]-type ).
 
       ELSEIF lines( lt_msg ) > 1.
         lv_text = | { lines( lt_msg ) } Messages found: |.
-        DATA(lv_details) = `<ul>`.
+        DATA lt_detail_items TYPE string_table.
         LOOP AT lt_msg REFERENCE INTO DATA(lr_msg).
-          lv_details = |{ lv_details }<li>{ lr_msg->text }</li>|.
+          INSERT |<li>{ lr_msg->text }</li>| INTO TABLE lt_detail_items.
         ENDLOOP.
-        lv_details = |{ lv_details }</ul>|.
+        DATA(lv_details) = `<ul>` && concat_lines_of( lt_detail_items ) && `</ul>`.
         IF title IS INITIAL.
-          lv_title = SWITCH #( lt_msg[ 1 ]-type
-                               WHEN `E` THEN `Error`
-                               WHEN `S` THEN `Success`
-                               WHEN `W` THEN `Warning`
-                               ELSE `Information` ).
+          lv_title = get_msg_title( lt_msg[ 1 ]-type ).
         ENDIF.
         lv_type = z2ui5_cl_util=>ui5_get_msg_type( lt_msg[ 1 ]-type ).
       ELSE.
@@ -187,7 +205,7 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD z2ui5_if_client~nav_app_call.
+  METHOD nav_app_set_id.
 
     IF app IS NOT BOUND.
       RAISE EXCEPTION TYPE z2ui5_cx_util_error
@@ -195,12 +213,18 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
           val = `NAV_APP_LEAVE_TO_INITIAL_APP_ERROR`.
     ENDIF.
 
-    mo_action->ms_next-o_app_call = app.
-
     IF app->id_app IS INITIAL.
       app->id_app = z2ui5_cl_util=>uuid_get_c32( ).
     ENDIF.
     result = app->id_app.
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_client~nav_app_call.
+
+    mo_action->ms_next-o_app_call = app.
+    result = nav_app_set_id( app ).
+
   ENDMETHOD.
 
   METHOD z2ui5_if_client~nav_app_leave.
@@ -209,18 +233,8 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
       app = z2ui5_if_client~get_app( z2ui5_if_client~get( )-s_draft-id_prev_app_stack ).
     ENDIF.
 
-    IF app IS NOT BOUND.
-      RAISE EXCEPTION TYPE z2ui5_cx_util_error
-        EXPORTING
-          val = `NAV_APP_LEAVE_TO_INITIAL_APP_ERROR`.
-    ENDIF.
-
     mo_action->ms_next-o_app_leave = app.
-
-    IF app->id_app IS INITIAL.
-      app->id_app = z2ui5_cl_util=>uuid_get_c32( ).
-    ENDIF.
-    result = app->id_app.
+    result = nav_app_set_id( app ).
 
   ENDMETHOD.
 
@@ -327,10 +341,9 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
 
   METHOD z2ui5_if_client~_bind.
 
-    DATA(lo_bind) = NEW z2ui5_cl_core_srv_bind( mo_action->mo_app ).
-    result = lo_bind->main( val    = z2ui5_cl_util=>conv_get_as_data_ref( val )
-                            type   = z2ui5_if_core_types=>cs_bind_type-one_way
-                            config = VALUE #( path_only            = path
+    result = mo_srv_bind->main( val = z2ui5_cl_util=>conv_get_as_data_ref( val )
+                            type    = z2ui5_if_core_types=>cs_bind_type-one_way
+                            config  = VALUE #( path_only           = path
                                               custom_filter        = custom_filter
                                               custom_mapper        = custom_mapper
                                               tab                  = z2ui5_cl_util=>conv_get_as_data_ref( tab )
@@ -341,10 +354,9 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
 
   METHOD z2ui5_if_client~_bind_edit.
 
-    DATA(lo_bind) = NEW z2ui5_cl_core_srv_bind( mo_action->mo_app ).
-    result = lo_bind->main( val    = z2ui5_cl_util=>conv_get_as_data_ref( val )
-                            type   = z2ui5_if_core_types=>cs_bind_type-two_way
-                            config = VALUE #( path_only            = path
+    result = mo_srv_bind->main( val = z2ui5_cl_util=>conv_get_as_data_ref( val )
+                            type    = z2ui5_if_core_types=>cs_bind_type-two_way
+                            config  = VALUE #( path_only           = path
                                               custom_filter        = custom_filter
                                               custom_filter_back   = custom_filter_back
                                               custom_mapper        = custom_mapper
@@ -357,10 +369,9 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
 
   METHOD z2ui5_if_client~_event.
 
-    DATA(lo_ui5) = NEW z2ui5_cl_core_srv_event( ).
-    result = lo_ui5->get_event( val   = val
-                                t_arg = t_arg
-                                s_cnt = s_ctrl ).
+    result = mo_srv_event->get_event( val = val
+                                t_arg     = t_arg
+                                s_cnt     = s_ctrl ).
 
     IF r_data IS NOT INITIAL.
       CREATE DATA mo_action->ms_next-r_data LIKE r_data.
@@ -371,9 +382,8 @@ CLASS z2ui5_cl_core_client IMPLEMENTATION.
 
   METHOD z2ui5_if_client~_event_client.
 
-    DATA(lo_ui5) = NEW z2ui5_cl_core_srv_event( ).
-    result = lo_ui5->get_event_client( val   = val
-                                       t_arg = t_arg ).
+    result = mo_srv_event->get_event_client( val = val
+                                       t_arg     = t_arg ).
 
   ENDMETHOD.
 
