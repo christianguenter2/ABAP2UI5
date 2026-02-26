@@ -41,6 +41,7 @@ CLASS z2ui5_cl_core_action DEFINITION
         VALUE(result) TYPE REF TO z2ui5_cl_core_action.
 
   PRIVATE SECTION.
+    METHODS reset_view_update_flags.
 ENDCLASS.
 
 
@@ -102,7 +103,6 @@ CLASS z2ui5_cl_core_action IMPLEMENTATION.
         DATA li_app TYPE REF TO z2ui5_if_app.
         CREATE OBJECT li_app TYPE (mo_http_post->ms_request-s_control-app_start).
         result->mo_app->mo_app = li_app.
-*        DATA(li_app) = CAST z2ui5_if_app( result->mo_app->mo_app ).
         li_app->id_draft = result->mo_app->ms_draft-id.
 
         result->ms_actual-check_on_navigated = abap_true.
@@ -157,6 +157,16 @@ CLASS z2ui5_cl_core_action IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD reset_view_update_flags.
+
+    ms_next-s_set-s_view-check_update_model       = abap_false.
+    ms_next-s_set-s_view_nest-check_update_model   = abap_false.
+    ms_next-s_set-s_view_nest2-check_update_model  = abap_false.
+    ms_next-s_set-s_popup-check_update_model       = abap_false.
+    ms_next-s_set-s_popover-check_update_model     = abap_false.
+
+  ENDMETHOD.
+
   METHOD prepare_app_stack.
 
     mo_app->db_save( ).
@@ -183,11 +193,7 @@ CLASS z2ui5_cl_core_action IMPLEMENTATION.
     result->ms_actual-check_on_navigated = abap_true.
     result->ms_next-s_set                = ms_next-s_set.
 
-    result->ms_next-s_set-s_view-check_update_model = abap_false.
-    result->ms_next-s_set-s_view_nest-check_update_model = abap_false.
-    result->ms_next-s_set-s_view_nest2-check_update_model = abap_false.
-    result->ms_next-s_set-s_popup-check_update_model = abap_false.
-    result->ms_next-s_set-s_popover-check_update_model = abap_false.
+    result->reset_view_update_flags( ).
 
     IF ms_next-s_set-s_follow_up_action IS NOT INITIAL.
       DATA(lv_action) = ms_next-s_set-s_follow_up_action-custom_js[ 1 ].
