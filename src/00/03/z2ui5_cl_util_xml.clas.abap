@@ -5,18 +5,6 @@ CLASS z2ui5_cl_util_xml DEFINITION
   PUBLIC SECTION.
 
     CLASS-METHODS factory
-      IMPORTING
-        t_ns          TYPE z2ui5_if_types=>ty_t_name_value OPTIONAL
-      RETURNING
-        VALUE(result) TYPE REF TO z2ui5_cl_util_xml.
-
-    CLASS-METHODS factory_popup
-      IMPORTING
-        t_ns          TYPE z2ui5_if_types=>ty_t_name_value OPTIONAL
-      RETURNING
-        VALUE(result) TYPE REF TO z2ui5_cl_util_xml.
-
-    CLASS-METHODS factory_plain
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_util_xml.
 
@@ -28,8 +16,7 @@ CLASS z2ui5_cl_util_xml DEFINITION
         ns            TYPE clike                           OPTIONAL
         a             TYPE clike                           OPTIONAL
         v             TYPE clike                           OPTIONAL
-        p             TYPE z2ui5_if_types=>ty_t_name_value OPTIONAL
-          PREFERRED PARAMETER n
+        p             TYPE z2ui5_cl_util=>ty_t_name_value OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_util_xml.
 
@@ -39,8 +26,7 @@ CLASS z2ui5_cl_util_xml DEFINITION
         ns            TYPE clike                           OPTIONAL
         a             TYPE clike                           OPTIONAL
         v             TYPE clike                           OPTIONAL
-        p             TYPE z2ui5_if_types=>ty_t_name_value OPTIONAL
-          PREFERRED PARAMETER n
+        p             TYPE z2ui5_cl_util=>ty_t_name_value OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_util_xml.
 
@@ -51,7 +37,7 @@ CLASS z2ui5_cl_util_xml DEFINITION
         ns            TYPE clike                           OPTIONAL
         a             TYPE clike                           OPTIONAL
         v             TYPE clike                           OPTIONAL
-        p             TYPE z2ui5_if_types=>ty_t_name_value OPTIONAL
+        p             TYPE z2ui5_cl_util=>ty_t_name_value OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_util_xml.
 
@@ -62,7 +48,7 @@ CLASS z2ui5_cl_util_xml DEFINITION
         ns            TYPE clike                           OPTIONAL
         a             TYPE clike                           OPTIONAL
         v             TYPE clike                           OPTIONAL
-        p             TYPE z2ui5_if_types=>ty_t_name_value OPTIONAL
+        p             TYPE z2ui5_cl_util=>ty_t_name_value OPTIONAL
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_util_xml.
 
@@ -90,6 +76,7 @@ CLASS z2ui5_cl_util_xml DEFINITION
     METHODS stringify
       IMPORTING
         from_root     TYPE abap_bool DEFAULT abap_true
+        indent        TYPE abap_bool DEFAULT abap_false
       RETURNING
         VALUE(result) TYPE string.
 
@@ -97,7 +84,7 @@ CLASS z2ui5_cl_util_xml DEFINITION
 
     DATA mv_name   TYPE string.
     DATA mv_ns     TYPE string.
-    DATA mt_prop   TYPE SORTED TABLE OF z2ui5_if_types=>ty_s_name_value WITH NON-UNIQUE KEY n.
+    DATA mt_prop   TYPE SORTED TABLE OF z2ui5_cl_util=>ty_s_name_value WITH NON-UNIQUE KEY n.
 
     DATA mo_root   TYPE REF TO z2ui5_cl_util_xml.
     DATA mo_previous TYPE REF TO z2ui5_cl_util_xml.
@@ -105,6 +92,12 @@ CLASS z2ui5_cl_util_xml DEFINITION
     DATA mt_child  TYPE STANDARD TABLE OF REF TO z2ui5_cl_util_xml WITH EMPTY KEY.
 
     METHODS xml_get_parts
+      CHANGING
+        ct_parts TYPE string_table.
+
+    METHODS xml_get_parts_indent
+      IMPORTING
+        iv_depth TYPE i DEFAULT 0
       CHANGING
         ct_parts TYPE string_table.
 
@@ -120,52 +113,6 @@ CLASS z2ui5_cl_util_xml IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD factory.
-
-    result = NEW #( ).
-
-    IF t_ns IS NOT INITIAL.
-      result->mt_prop = t_ns.
-    ENDIF.
-
-    result->mt_prop   = VALUE #( BASE result->mt_prop
-                                 (  n = `displayBlock`   v = `true` )
-                                 (  n = `height`         v = `100%` ) ).
-
-    result->mv_name   = `View`.
-    result->mv_ns     = `mvc`.
-    result->mo_root   = result.
-    result->mo_parent = result.
-
-    INSERT VALUE #( n = `xmlns`
-                    v = `sap.m` ) INTO TABLE result->mt_prop.
-    INSERT VALUE #( n = `xmlns:mvc`
-                    v = `sap.ui.core.mvc` ) INTO TABLE result->mt_prop.
-    INSERT VALUE #( n = `xmlns:core`
-                    v = `sap.ui.core` ) INTO TABLE result->mt_prop.
-
-  ENDMETHOD.
-
-  METHOD factory_popup.
-
-    result = NEW #( ).
-
-    IF t_ns IS NOT INITIAL.
-      result->mt_prop = t_ns.
-    ENDIF.
-
-    result->mv_name   = `FragmentDefinition`.
-    result->mv_ns     = `core`.
-    result->mo_root   = result.
-    result->mo_parent = result.
-
-    INSERT VALUE #( n = `xmlns`
-                    v = `sap.m` ) INTO TABLE result->mt_prop.
-    INSERT VALUE #( n = `xmlns:core`
-                    v = `sap.ui.core` ) INTO TABLE result->mt_prop.
-
-  ENDMETHOD.
-
-  METHOD factory_plain.
 
     result = NEW #( ).
 
@@ -269,16 +216,32 @@ CLASS z2ui5_cl_util_xml IMPLEMENTATION.
   METHOD stringify.
 
     DATA lt_parts TYPE string_table.
-    IF from_root = abap_true.
-      mo_root->xml_get_parts( CHANGING ct_parts = lt_parts ).
+    IF indent = abap_true.
+      IF from_root = abap_true.
+        mo_root->xml_get_parts_indent( CHANGING ct_parts = lt_parts ).
+      ELSE.
+        xml_get_parts_indent( CHANGING ct_parts = lt_parts ).
+      ENDIF.
+      result = concat_lines_of( table = lt_parts sep = |\n| ).
     ELSE.
-      xml_get_parts( CHANGING ct_parts = lt_parts ).
+      IF from_root = abap_true.
+        mo_root->xml_get_parts( CHANGING ct_parts = lt_parts ).
+      ELSE.
+        xml_get_parts( CHANGING ct_parts = lt_parts ).
+      ENDIF.
+      result = concat_lines_of( lt_parts ).
     ENDIF.
-    result = concat_lines_of( lt_parts ).
 
   ENDMETHOD.
 
   METHOD xml_get_parts.
+
+    IF mv_name IS INITIAL.
+      LOOP AT mt_child INTO DATA(lr_root).
+        CAST z2ui5_cl_util_xml( lr_root )->xml_get_parts( CHANGING ct_parts = ct_parts ).
+      ENDLOOP.
+      RETURN.
+    ENDIF.
 
     DATA(lv_tmp2) = COND #( WHEN mv_ns <> `` THEN |{ mv_ns }:| ).
     DATA(lv_tmp3) = REDUCE string( INIT val = `` FOR row IN mt_prop WHERE ( v <> `` ) "#EC CI_SORTSEQ
@@ -299,6 +262,40 @@ CLASS z2ui5_cl_util_xml IMPLEMENTATION.
     ENDLOOP.
 
     APPEND |</{ lv_tmp2 }{ mv_name }>| TO ct_parts.
+
+  ENDMETHOD.
+
+  METHOD xml_get_parts_indent.
+
+    IF mv_name IS INITIAL.
+      LOOP AT mt_child INTO DATA(lr_root).
+        CAST z2ui5_cl_util_xml( lr_root )->xml_get_parts_indent( EXPORTING iv_depth = iv_depth
+                                                                  CHANGING ct_parts = ct_parts ).
+      ENDLOOP.
+      RETURN.
+    ENDIF.
+
+    DATA(lv_pad)  = repeat( val = ` ` occ = iv_depth * 2 ).
+    DATA(lv_ns)   = COND #( WHEN mv_ns <> `` THEN |{ mv_ns }:| ).
+    DATA(lv_attr) = REDUCE string( INIT val = `` FOR row IN mt_prop WHERE ( v <> `` ) "#EC CI_SORTSEQ
+                          NEXT val = |{ val } { row-n }="{ escape( val    = COND string( WHEN row-v = abap_true
+                                                                                         THEN `true`
+                                                                                         ELSE row-v )
+                                                                   format = cl_abap_format=>e_xml_attr ) }"| ).
+
+    IF mt_child IS INITIAL.
+      APPEND |{ lv_pad }<{ lv_ns }{ mv_name }{ lv_attr }/>| TO ct_parts.
+      RETURN.
+    ENDIF.
+
+    APPEND |{ lv_pad }<{ lv_ns }{ mv_name }{ lv_attr }>| TO ct_parts.
+
+    LOOP AT mt_child INTO DATA(lr_child).
+      CAST z2ui5_cl_util_xml( lr_child )->xml_get_parts_indent( EXPORTING iv_depth = iv_depth + 1
+                                                                 CHANGING ct_parts = ct_parts ).
+    ENDLOOP.
+
+    APPEND |{ lv_pad }</{ lv_ns }{ mv_name }>| TO ct_parts.
 
   ENDMETHOD.
 
