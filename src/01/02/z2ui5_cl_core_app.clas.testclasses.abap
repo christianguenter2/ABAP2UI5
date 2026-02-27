@@ -5,7 +5,16 @@ CLASS ltcl_test DEFINITION FINAL
     METHODS first_test FOR TESTING RAISING cx_static_check.
 ENDCLASS.
 
+CLASS ltcl_test_buffer DEFINITION FINAL
+  FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+
+  PRIVATE SECTION.
+    METHODS test_evict_lru FOR TESTING.
+    METHODS test_clear_resets_counter FOR TESTING.
+ENDCLASS.
+
 CLASS z2ui5_cl_core_app DEFINITION LOCAL FRIENDS ltcl_test.
+CLASS z2ui5_cl_core_app DEFINITION LOCAL FRIENDS ltcl_test_buffer.
 
 CLASS ltcl_test IMPLEMENTATION.
   METHOD first_test.
@@ -66,4 +75,41 @@ CLASS ltcl_test_db IMPLEMENTATION.
   METHOD z2ui5_if_app~main.
 
   ENDMETHOD.
+ENDCLASS.
+
+
+CLASS ltcl_test_buffer IMPLEMENTATION.
+
+  METHOD test_evict_lru.
+
+    z2ui5_cl_core_app=>db_load_buffer_clear( ).
+
+    INSERT VALUE #( id = `A` app = NEW z2ui5_cl_core_app( ) last = 1 ) INTO TABLE z2ui5_cl_core_app=>mt_buffer.
+    INSERT VALUE #( id = `B` app = NEW z2ui5_cl_core_app( ) last = 3 ) INTO TABLE z2ui5_cl_core_app=>mt_buffer.
+    INSERT VALUE #( id = `C` app = NEW z2ui5_cl_core_app( ) last = 2 ) INTO TABLE z2ui5_cl_core_app=>mt_buffer.
+
+    z2ui5_cl_core_app=>buffer_evict_lru( ).
+
+    cl_abap_unit_assert=>assert_equals( exp = 2
+                                        act = lines( z2ui5_cl_core_app=>mt_buffer ) ).
+    cl_abap_unit_assert=>assert_false( xsdbool( line_exists( z2ui5_cl_core_app=>mt_buffer[ id = `A` ] ) ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( z2ui5_cl_core_app=>mt_buffer[ id = `B` ] ) ) ).
+    cl_abap_unit_assert=>assert_true( xsdbool( line_exists( z2ui5_cl_core_app=>mt_buffer[ id = `C` ] ) ) ).
+
+  ENDMETHOD.
+
+  METHOD test_clear_resets_counter.
+
+    z2ui5_cl_core_app=>mv_lru_counter = 42.
+    INSERT VALUE #( id = `X` app = NEW z2ui5_cl_core_app( ) last = 42 ) INTO TABLE z2ui5_cl_core_app=>mt_buffer.
+
+    z2ui5_cl_core_app=>db_load_buffer_clear( ).
+
+    cl_abap_unit_assert=>assert_equals( exp = 0
+                                        act = z2ui5_cl_core_app=>mv_lru_counter ).
+    cl_abap_unit_assert=>assert_equals( exp = 0
+                                        act = lines( z2ui5_cl_core_app=>mt_buffer ) ).
+
+  ENDMETHOD.
+
 ENDCLASS.

@@ -31,11 +31,14 @@ CLASS z2ui5_cl_core_app DEFINITION
 
     TYPES:
       BEGIN OF ty_s_buffer,
-        id  TYPE string,
-        app TYPE REF TO z2ui5_cl_core_app,
+        id   TYPE string,
+        app  TYPE REF TO z2ui5_cl_core_app,
+        last TYPE i,
       END OF ty_s_buffer.
 
+    CONSTANTS c_max_buffer_size TYPE i VALUE 100.
     CLASS-DATA mt_buffer TYPE SORTED TABLE OF ty_s_buffer WITH UNIQUE KEY id.
+    CLASS-DATA mv_lru_counter TYPE i.
 
     CLASS-METHODS db_load
       IMPORTING
@@ -57,6 +60,7 @@ CLASS z2ui5_cl_core_app DEFINITION
   PROTECTED SECTION.
 
   PRIVATE SECTION.
+    CLASS-METHODS buffer_evict_lru.
     METHODS create_model
       RETURNING
         VALUE(result) TYPE REF TO z2ui5_cl_core_srv_model.
@@ -117,7 +121,10 @@ CLASS z2ui5_cl_core_app IMPLEMENTATION.
     lv_id = id.
 
     IF line_exists( mt_buffer[ id = lv_id ] ).
-      result = mt_buffer[ id = lv_id ]-app.
+      ASSIGN mt_buffer[ id = lv_id ] TO FIELD-SYMBOL(<ls_buffer>).
+      mv_lru_counter = mv_lru_counter + 1.
+      <ls_buffer>-last = mv_lru_counter.
+      result = <ls_buffer>-app.
       RETURN.
     ENDIF.
 
@@ -127,13 +134,19 @@ CLASS z2ui5_cl_core_app IMPLEMENTATION.
 
     result->create_model( )->main_attri_db_load( ).
 
-    INSERT VALUE #( id = lv_id app = result ) INTO TABLE mt_buffer.
+    IF lines( mt_buffer ) >= c_max_buffer_size.
+      buffer_evict_lru( ).
+    ENDIF.
+
+    mv_lru_counter = mv_lru_counter + 1.
+    INSERT VALUE #( id = lv_id app = result last = mv_lru_counter ) INTO TABLE mt_buffer.
 
   ENDMETHOD.
 
   METHOD db_load_buffer_clear.
 
     CLEAR mt_buffer.
+    CLEAR mv_lru_counter.
 
   ENDMETHOD.
 
@@ -173,6 +186,22 @@ CLASS z2ui5_cl_core_app IMPLEMENTATION.
   METHOD model_json_stringify.
 
     result = create_model( )->main_json_stringify( ).
+
+  ENDMETHOD.
+
+  METHOD buffer_evict_lru.
+
+    DATA lv_lru_id TYPE string.
+    DATA lv_min_last TYPE i.
+
+    LOOP AT mt_buffer ASSIGNING FIELD-SYMBOL(<ls_buf>).
+      IF lv_lru_id IS INITIAL OR <ls_buf>-last < lv_min_last.
+        lv_min_last = <ls_buf>-last.
+        lv_lru_id   = <ls_buf>-id.
+      ENDIF.
+    ENDLOOP.
+
+    DELETE mt_buffer WHERE id = lv_lru_id.
 
   ENDMETHOD.
 
