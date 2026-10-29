@@ -105,7 +105,7 @@ function load() {
       "z2ui5/core/Context": contextStub(ctx),
       "z2ui5/core/Lib": {
         logError: () => {},
-        usesXmlTemplating: () => false,
+        usesXmlTemplating: (xml) => xml.includes("template:"),
         isAlive: (o) => Boolean(o) && !o.destroyed,
         isRootModelSlot: (key) => ["MAIN", "NEST", "NEST2"].includes(key),
         effectiveSizeLimit: () => undefined,
@@ -289,5 +289,16 @@ test("a MAIN display with a page transition never keeps", async () => {
     build.catch(() => {}),
     new Promise((r) => setTimeout(r, 50)),
   ]);
+  expect(builds.length).toBe(2);
+});
+
+test("a view with XML templating is always built anew", async () => {
+  // the template is evaluated at build time, against the data of that
+  // moment - the same XML can stand for another view now
+  const { Slots, builds, respond } = load();
+  const xml = "<View><template:if test='{template>/FLAG}'/></View>";
+  respond("ZCL_APP", ["MAIN"]);
+  await Slots.action("display", "MAIN", xml);
+  await Slots.action("display", "MAIN", xml);
   expect(builds.length).toBe(2);
 });

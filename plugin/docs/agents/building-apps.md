@@ -515,7 +515,8 @@ The same tree, with the subtree held in a variable:
   the view built anew from scratch anyway - to reset exactly that state -
   destroy it first in the same roundtrip: `client->view_destroy( )`, then
   `client->view_display( ... )` (the same with `popup_destroy( )` and the
-  other slots).
+  other slots). A view with XML templating (`template:if`, `template:repeat`,
+  ...) is always built anew - its template output depends on the data.
 - `view_model_update( )`, `popup_model_update( )`, `popover_model_update( )`
   and the two nested variants are **obsolete and do nothing**. They stay in
   the interface so existing apps keep compiling; delete the calls whenever

@@ -738,6 +738,10 @@ sap.ui.define(
 
     function canKeep(ctx, slotKey, xml, options) {
       if (options.rebuild === true) return false;
+      // XML templating is evaluated once, at build time, against the data of
+      // that moment: the same XML stands for a different view once the data
+      // changed (template:if on a bound flag - sample app 173)
+      if (Lib.usesXmlTemplating(xml)) return false;
       if (!Lib.isAlive(ViewSlots.getView(ctx, slotKey))) return false;
       if (ViewSlots.getViewXml(ctx, slotKey) !== xml) return false;
       const recorded = ViewSlots.getViewOptions(ctx, slotKey);

@@ -484,6 +484,8 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `` && |\n| &&
              `    function canKeep(ctx, slotKey, xml, options) {` && |\n| &&
              `      if (options.rebuild === true) return false;` && |\n| &&
+             `` && |\n| &&
+             `      if (Lib.usesXmlTemplating(xml)) return false;` && |\n| &&
              `      if (!Lib.isAlive(ViewSlots.getView(ctx, slotKey))) return false;` && |\n| &&
              `      if (ViewSlots.getViewXml(ctx, slotKey) !== xml) return false;` && |\n| &&
              `      const recorded = ViewSlots.getViewOptions(ctx, slotKey);` && |\n| &&
