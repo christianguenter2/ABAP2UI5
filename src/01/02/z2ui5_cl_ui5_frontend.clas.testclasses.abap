@@ -21,6 +21,9 @@ CLASS ltcl_test_frontend DEFINITION FINAL
     METHODS test_main_drops_teardowns FOR TESTING RAISING cx_static_check.
     METHODS test_main_keeps_displays  FOR TESTING RAISING cx_static_check.
     METHODS test_teardowns_no_main    FOR TESTING RAISING cx_static_check.
+    METHODS test_destroy_then_display FOR TESTING RAISING cx_static_check.
+    METHODS test_display_after_display FOR TESTING RAISING cx_static_check.
+    METHODS test_rebuild_survives_redisp FOR TESTING RAISING cx_static_check.
 
     METHODS queued
       RETURNING
@@ -276,6 +279,53 @@ CLASS ltcl_test_frontend IMPLEMENTATION.
 
     cl_abap_unit_assert=>assert_equals(
         exp = `["VIEW_SLOTS","destroy","POPUP"]|["VIEW_SLOTS","destroy","POPOVER"]`
+        act = serialized( ) ).
+
+  ENDMETHOD.
+
+  METHOD test_destroy_then_display.
+
+    " the frontend keeps a slot that shows the same XML already - an app
+    " that destroys the slot first asks for it to be built anew, and the
+    " display says so instead of travelling as a plain one
+    mo_cut->slot_destroy( z2ui5_if_client=>cs_view-main ).
+    mo_cut->slot_display( slot = z2ui5_if_client=>cs_view-main
+                          xml  = `<View/>` ).
+
+    cl_abap_unit_assert=>assert_equals(
+        exp = `["VIEW_SLOTS","display","MAIN","<View/>",{"rebuild":true}]`
+        act = serialized( ) ).
+
+  ENDMETHOD.
+
+  METHOD test_rebuild_survives_redisp.
+
+    " destroy, display, display again: the second display replaces the
+    " first, and the rebuild request travels on with it
+    mo_cut->slot_destroy( z2ui5_if_client=>cs_view-popup ).
+    mo_cut->slot_display( slot = z2ui5_if_client=>cs_view-popup
+                          xml  = `<Dialog id="a"/>` ).
+    mo_cut->slot_display( slot = z2ui5_if_client=>cs_view-popup
+                          xml  = `<Dialog/>` ).
+
+    cl_abap_unit_assert=>assert_equals(
+        exp = `["VIEW_SLOTS","display","POPUP","<Dialog/>",{"rebuild":true}]`
+        act = serialized( ) ).
+
+  ENDMETHOD.
+
+  METHOD test_display_after_display.
+
+    " a display replacing an earlier display of the same slot is no
+    " rebuild request - and a destroy of ANOTHER slot is none either
+    mo_cut->slot_destroy( z2ui5_if_client=>cs_view-popover ).
+    mo_cut->slot_display( slot = z2ui5_if_client=>cs_view-popup
+                          xml  = `<Dialog id="a"/>` ).
+    mo_cut->slot_display( slot = z2ui5_if_client=>cs_view-popup
+                          xml  = `<Dialog/>` ).
+
+    cl_abap_unit_assert=>assert_equals(
+        exp = `["VIEW_SLOTS","display","POPUP","<Dialog/>"]|["VIEW_SLOTS","destroy","POPOVER"]`
         act = serialized( ) ).
 
   ENDMETHOD.

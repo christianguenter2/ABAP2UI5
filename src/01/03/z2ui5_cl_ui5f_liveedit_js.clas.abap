@@ -57,8 +57,10 @@ CLASS z2ui5_cl_ui5f_liveedit_js IMPLEMENTATION.
              `      const modelData = oldModel?.getData?.();` && |\n| &&
              `` && |\n| &&
              `      try {` && |\n| &&
-             `        const options =` && |\n| &&
-             `          slotKey === "MAIN" ? ctx.state.lastMainDisplayOptions || {} : {};` && |\n| &&
+             `        const options = {` && |\n| &&
+             `          ...(slotKey === "MAIN" ? ctx.state.lastMainDisplayOptions : {}),` && |\n| &&
+             `          rebuild: true,` && |\n| &&
+             `        };` && |\n| &&
              `        await Slots.action(ctx, "display", slotKey, xml, options, undefined);` && |\n| &&
              `      } catch (e) {` && |\n| &&
              `        Lib.logError("DevTools LiveEdit: applying the edited XML failed", e);` && |\n| &&

@@ -261,6 +261,8 @@ test.describe("the fragment slots build through the serialized chain", () => {
           getController: () => null,
           getView: () => null,
           resolveById: () => null,
+          getViewXml: () => undefined,
+          getViewOptions: () => undefined,
         },
       },
     });

@@ -506,6 +506,14 @@ The same tree, with the subtree held in a variable:
   render stale by forgetting anything: there is nothing to call and nothing
   to switch on. Call `view_display` again only when the view **structure**
   itself changes.
+- A `view_display` (or `popup_display`, `nest_view_display`, ...) whose XML
+  is the one the browser already shows **keeps the live view**: no rebuild,
+  only the data is pushed, and what no binding holds (column widths,
+  expanded panels, an unbound selection, the focus) stays as it was. To have
+  the view built anew from scratch anyway - to reset exactly that state -
+  destroy it first in the same roundtrip: `client->view_destroy( )`, then
+  `client->view_display( ... )` (the same with `popup_destroy( )` and the
+  other slots).
 - `view_model_update( )`, `popup_model_update( )`, `popover_model_update( )`
   and the two nested variants are **obsolete and do nothing**. They stay in
   the interface so existing apps keep compiling; delete the calls whenever

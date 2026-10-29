@@ -73,6 +73,10 @@
 //                     read a slot's source from here: a fragment or a view
 //                     built from a `definition` keeps no viewContent of its
 //                     own
+//   slotOptions       the display options each slot was built with, per
+//                     slot key - recorded and dropped alongside slotXml.
+//                     XML and options together say whether a display may
+//                     keep the live slot (actions/Slots canKeep)
 //   slotApp           the app class each slot was filled BY, per slot key -
 //                     recorded and dropped alongside slotXml. A response
 //                     carries the model of ONE app, so this is what says
@@ -213,6 +217,7 @@ sap.ui.define([], () => {
       oControllerPopup: null,
       oControllerPopover: null,
       slotXml: {},
+      slotOptions: {},
       slotApp: {},
       oLaunchpad: null,
 

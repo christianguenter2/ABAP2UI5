@@ -346,6 +346,9 @@ INTERFACE z2ui5_if_client
   "! Display the MAIN view. A new main view is a new screen, so an open
   "! popup and popover go with it - re-open one in the same roundtrip if it
   "! is meant to survive ( the frontend builds MAIN first, then the popup ).
+  "! The XML the browser already shows is not built again: the live view
+  "! stays and only the data is pushed. view_destroy( ) before it in the
+  "! same roundtrip builds it anew anyway.
   "!
   "! @parameter val | the view XML - what z2ui5_cl_ui5_view_builder=>stringify( )
   "!                  returns, a sap.ui.core.mvc.View with everything inside it.

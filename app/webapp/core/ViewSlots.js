@@ -110,7 +110,10 @@ sap.ui.define(
     // viewContent stays empty), and the developer tools have no other way
     // back to it. Recorded HERE and dropped in destroy(), so the record
     // follows the slot itself - not the response that happened to fill it.
-    function setView(ctx, key, view, xml) {
+    // `options` are the display options the slot was built with, recorded
+    // the same way: a display of the same XML with the same options keeps
+    // the live slot instead of rebuilding it (actions/Slots canKeep).
+    function setView(ctx, key, view, xml, options) {
       const slot = byKey(key);
       if (!slot) return;
       ctx.state[slot.prop] = view;
@@ -118,6 +121,7 @@ sap.ui.define(
       // in this view without an owner component of its own
       Context.registerView(ctx, view);
       slotXmlStore(ctx)[key] = xml;
+      ctx.state.slotOptions[key] = options ?? {};
       // ...and WHICH APP filled it, recorded the same way and for the same
       // reason: a response carries the model of exactly one app, and the
       // slots do not all belong to the same one. An app that is called only
@@ -131,6 +135,12 @@ sap.ui.define(
     // The XML a slot currently holds, undefined once it was torn down.
     function getViewXml(ctx, key) {
       return slotXmlStore(ctx)[key];
+    }
+
+    // The display options a slot was built with, undefined once it was
+    // torn down.
+    function getViewOptions(ctx, key) {
+      return ctx.state.slotOptions[key];
     }
 
     // The record lives on the state (so an app restart resets it with
@@ -310,6 +320,7 @@ sap.ui.define(
       // source behind - the developer tools read "is this slot filled" off
       // this record.
       delete slotXmlStore(ctx)[key];
+      delete ctx.state.slotOptions[key];
       delete slotAppStore(ctx)[key];
       const view = ctx.state[slot.prop];
       if (!view) return;
@@ -370,6 +381,7 @@ sap.ui.define(
       if (!slot || !ctx?.state) return undefined;
       for (const dep of slot.dependentSlots ?? []) detach(ctx, dep);
       delete slotXmlStore(ctx)[key];
+      delete ctx.state.slotOptions[key];
       delete slotAppStore(ctx)[key];
       const view = ctx.state[slot.prop];
       if (!view) return undefined;
@@ -386,6 +398,7 @@ sap.ui.define(
       slots,
       getView,
       getViewXml,
+      getViewOptions,
       getViewApp,
       setView,
       getController,

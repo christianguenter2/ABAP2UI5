@@ -152,7 +152,7 @@ sap.ui.define(
       return oFragment;
     }
 
-    async function displayFragment(ctx, xml, seq) {
+    async function displayFragment(ctx, xml, mOptions, seq) {
       const oFragment = await loadSlotFragment(
         ctx,
         "POPUP",
@@ -164,11 +164,12 @@ sap.ui.define(
       // The shared device + message models are attached inside
       // ViewSlots.setView (the single funnel), so error paths that
       // destroy a view without reaching setView never register it.
-      ViewSlots.setView(ctx, "POPUP", oFragment, xml);
+      ViewSlots.setView(ctx, "POPUP", oFragment, xml, mOptions);
       oFragment.open();
     }
 
-    async function displayPopover(ctx, xml, openById, seq) {
+    async function displayPopover(ctx, xml, mOptions, seq) {
+      const openById = mOptions.openById;
       // No catch-all here on purpose: a malformed-XML load or render
       // failure must propagate to _processAfterRendering and surface the
       // fatal "App Terminated" overlay, exactly like displayFragment and
@@ -194,7 +195,7 @@ sap.ui.define(
         oFragment.destroy();
         return;
       }
-      ViewSlots.setView(ctx, "POPOVER", oFragment, xml);
+      ViewSlots.setView(ctx, "POPOVER", oFragment, xml, mOptions);
       // The anchor may not be in the DOM yet: a response can build the MAIN
       // view and open a popover on one of its controls in the SAME
       // roundtrip - the build is awaited, but its rendering happens later.
@@ -287,7 +288,7 @@ sap.ui.define(
         oView.destroy();
         return;
       }
-      ViewSlots.setView(ctx, slotKey, oView, xml);
+      ViewSlots.setView(ctx, slotKey, oView, xml, mOptions);
     }
 
     // The local id of the MAIN view. A page transition builds the arriving
@@ -393,7 +394,7 @@ sap.ui.define(
       // response was data-only. The cost is one stale render that the
       // chained build replaces a moment later.
 
-      ViewSlots.setView(ctx, "MAIN", oView, xml);
+      ViewSlots.setView(ctx, "MAIN", oView, xml, mOptions);
       if (switchPath) oView.setModel(oViewModel, "http");
       return place(ctx, oView);
     }
@@ -709,6 +710,75 @@ sap.ui.define(
       return ctx.server.viewBuild;
     }
 
+    // ------------------------------------------------------------------
+    // Keeping a slot whose view is unchanged. Many apps call view_display( )
+    // again on an ordinary event with the same XML. A rebuild then destroys
+    // and recreates every control of the view - several times the cost of
+    // the model push alone (zcl_tst_bench_view in node/srv) - and drops the control state
+    // no binding holds (column widths, expanded panels, unbound selections,
+    // the focus). A display of the XML the slot already holds, with the same
+    // options and for the same app, keeps the live view instead; the model
+    // push that every display carries (View1, MODELPRESENT) brings the data.
+    // The backend asks for a real rebuild with `rebuild` - an app that
+    // destroys the slot and displays it again in the same roundtrip
+    // (z2ui5_cl_ui5_frontend=>slot_display).
+    // ------------------------------------------------------------------
+
+    // The options a display is compared by: the page-change options say how
+    // a page arrives, not what it is, and `rebuild` is the request itself.
+    function optionsKey(options) {
+      const rest = { ...options };
+      for (const key of [...TRANSITION_OPTIONS, "rebuild"]) delete rest[key];
+      return JSON.stringify(
+        Object.keys(rest)
+          .sort()
+          .map((k) => [k, rest[k]]),
+      );
+    }
+
+    function canKeep(ctx, slotKey, xml, options) {
+      if (options.rebuild === true) return false;
+      if (!Lib.isAlive(ViewSlots.getView(ctx, slotKey))) return false;
+      if (ViewSlots.getViewXml(ctx, slotKey) !== xml) return false;
+      const recorded = ViewSlots.getViewOptions(ctx, slotKey);
+      if (!recorded || optionsKey(recorded) !== optionsKey(options)) {
+        return false;
+      }
+      // the model push only reaches a slot of the responding app
+      // (updateModelIfRequired) - a slot of another app has to be rebuilt
+      // for its data to arrive
+      const app = ctx.state.oResponse?.APP;
+      return Boolean(app) && ViewSlots.getViewApp(ctx, slotKey) === app;
+    }
+
+    // Does the response being processed display `slotKey` itself?
+    function respondsWithDisplay(ctx, slotKey) {
+      const actions = ctx.state.oResponse?.S_ACTION?.T_SYSTEM;
+      return (
+        Array.isArray(actions) &&
+        actions.some(
+          (item) =>
+            Array.isArray(item) &&
+            item[0] === "VIEW_SLOTS" &&
+            item[1] === "display" &&
+            item[2] === slotKey,
+        )
+      );
+    }
+
+    // A kept MAIN view ends the other slots exactly as a rebuild would: the
+    // nested views die with the old page, and the backend sends no destroy
+    // for a popup or popover next to a MAIN display (z2ui5_cl_ui5_frontend=>
+    // slots_serialize). A slot the same response displays again is left to
+    // its own display, which keeps it as well when it is unchanged.
+    function keepMain(ctx, mOptions) {
+      rememberPlainArrival(ctx, mOptions, true);
+      for (const key of ["NEST", "NEST2", "POPUP", "POPOVER"]) {
+        if (!respondsWithDisplay(ctx, key)) ViewSlots.destroy(ctx, key);
+      }
+      return true;
+    }
+
     // The MAIN rebuild, serialized through chainBuild (see there).
     function displayMain(ctx, xml, mOptions, seq) {
       return chainBuild(ctx, seq, async () => {
@@ -725,6 +795,10 @@ sap.ui.define(
         ctx.state.mainLeaving?.();
         const plan = transitionPlan(ctx, mOptions);
         if (plan) return displayPaged(ctx, xml, mOptions, plan);
+        // the same page again, for the same app instance - see canKeep
+        if (canKeep(ctx, "MAIN", xml, mOptions) && isSameOwner(ctx, mOptions)) {
+          return keepMain(ctx, mOptions);
+        }
         // asked BEFORE the slot is emptied below, which drops the record it
         // reads
         rememberPlainArrival(ctx, mOptions, isSameOwner(ctx, mOptions));
@@ -799,11 +873,21 @@ sap.ui.define(
 
     // The two fragment slots, serialized through the same chain: the slot
     // is replaced inside the step, once every earlier build has settled.
+    // A popup or popover that is still open with the same XML stays open:
+    // no close and re-open animation, and what the user did inside it
+    // survives. One the user closed without a roundtrip is opened anew.
     function displayStandalone(ctx, slotKey, xml, mOptions, seq) {
       return chainBuild(ctx, seq, () => {
+        if (
+          canKeep(ctx, slotKey, xml, mOptions) &&
+          ViewSlots.getView(ctx, slotKey).isOpen?.() === true
+        ) {
+          return undefined;
+        }
         ViewSlots.destroy(ctx, slotKey);
-        if (slotKey === "POPUP") return displayFragment(ctx, xml, seq);
-        return displayPopover(ctx, xml, mOptions.openById, seq);
+        if (slotKey === "POPUP")
+          return displayFragment(ctx, xml, mOptions, seq);
+        return displayPopover(ctx, xml, mOptions, seq);
       });
     }
 
@@ -936,12 +1020,15 @@ sap.ui.define(
         // transition - a re-display shows the same screen, it goes nowhere
         const reusable = { ...options };
         for (const key of TRANSITION_OPTIONS) delete reusable[key];
+        delete reusable.rebuild;
         ctx.state.lastMainDisplayOptions = reusable;
         return displayMain(ctx, xml, options, seq);
       }
       if (slotKey === "POPUP" || slotKey === "POPOVER") {
         return displayStandalone(ctx, slotKey, xml, options, seq);
       }
+      // a nested view inherits the MAIN model, which the push refreshes
+      if (canKeep(ctx, slotKey, xml, options)) return undefined;
       ViewSlots.destroy(ctx, slotKey);
       return displayNestedView(ctx, xml, slotKey, options, seq);
     }

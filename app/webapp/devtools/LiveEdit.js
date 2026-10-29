@@ -71,8 +71,12 @@ sap.ui.define(
         // its last real display (switch-mode OData default model included) -
         // an empty {} stripped them and broke the preview of exactly those
         // apps.
-        const options =
-          slotKey === "MAIN" ? ctx.state.lastMainDisplayOptions || {} : {};
+        // `rebuild`: Apply always builds anew, even when the editor holds the
+        // XML the slot already shows (Slots.canKeep would keep it)
+        const options = {
+          ...(slotKey === "MAIN" ? ctx.state.lastMainDisplayOptions : {}),
+          rebuild: true,
+        };
         await Slots.action(ctx, "display", slotKey, xml, options, undefined);
       } catch (e) {
         Lib.logError("DevTools LiveEdit: applying the edited XML failed", e);

@@ -114,7 +114,7 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `      return oFragment;` && |\n| &&
              `    }` && |\n| &&
              `` && |\n| &&
-             `    async function displayFragment(ctx, xml, seq) {` && |\n| &&
+             `    async function displayFragment(ctx, xml, mOptions, seq) {` && |\n| &&
              `      const oFragment = await loadSlotFragment(` && |\n| &&
              `        ctx,` && |\n| &&
              `        "POPUP",` && |\n| &&
@@ -124,11 +124,13 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `      );` && |\n| &&
              `      if (!oFragment) return;` && |\n| &&
              `` && |\n| &&
-             `      ViewSlots.setView(ctx, "POPUP", oFragment, xml);` && |\n| &&
+             `      ViewSlots.setView(ctx, "POPUP", oFragment, xml, mOptions);` && |\n| &&
              `      oFragment.open();` && |\n| &&
              `    }` && |\n| &&
              `` && |\n| &&
-             `    async function displayPopover(ctx, xml, openById, seq) {` && |\n| &&
+             `    async function displayPopover(ctx, xml, mOptions, seq) {` && |\n| &&
+             `      const openById = mOptions.openById;` && |\n| &&
+             `` && |\n| &&
              `      const oFragment = await loadSlotFragment(` && |\n| &&
              `        ctx,` && |\n| &&
              `        "POPOVER",` && |\n| &&
@@ -145,7 +147,7 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `        oFragment.destroy();` && |\n| &&
              `        return;` && |\n| &&
              `      }` && |\n| &&
-             `      ViewSlots.setView(ctx, "POPOVER", oFragment, xml);` && |\n| &&
+             `      ViewSlots.setView(ctx, "POPOVER", oFragment, xml, mOptions);` && |\n| &&
              `` && |\n| &&
              `      Lib.whenRendered(oControl, oFragment, () => oFragment.openBy(oControl));` && |\n| &&
              `    }` && |\n| &&
@@ -208,7 +210,7 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `        oView.destroy();` && |\n| &&
              `        return;` && |\n| &&
              `      }` && |\n| &&
-             `      ViewSlots.setView(ctx, slotKey, oView, xml);` && |\n| &&
+             `      ViewSlots.setView(ctx, slotKey, oView, xml, mOptions);` && |\n| &&
              `    }` && |\n| &&
              `` && |\n| &&
              `    const MAIN_VIEW_ID = "mainView";` && |\n| &&
@@ -267,7 +269,7 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `        return undefined;` && |\n| &&
              `      }` && |\n| &&
              `` && |\n| &&
-             `      ViewSlots.setView(ctx, "MAIN", oView, xml);` && |\n| &&
+             `      ViewSlots.setView(ctx, "MAIN", oView, xml, mOptions);` && |\n| &&
              `      if (switchPath) oView.setModel(oViewModel, "http");` && |\n| &&
              `      return place(ctx, oView);` && |\n| &&
              `    }` && |\n| &&
@@ -422,10 +424,10 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `      }` && |\n| &&
              `      return true;` && |\n| &&
              `    }` && |\n| &&
-             `` && |\n| &&
-             `    async function displayPaged(ctx, xml, mOptions, plan) {` && |\n| &&
-             `      const state = ctx.state;` && |\n|.
+             `` && |\n|.
     result = result &&
+             `    async function displayPaged(ctx, xml, mOptions, plan) {` && |\n| &&
+             `      const state = ctx.state;` && |\n| &&
              `` && |\n| &&
              `      const oOld = ViewSlots.detach(ctx, "MAIN");` && |\n| &&
              `` && |\n| &&
@@ -470,6 +472,51 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `      return ctx.server.viewBuild;` && |\n| &&
              `    }` && |\n| &&
              `` && |\n| &&
+             `    function optionsKey(options) {` && |\n| &&
+             `      const rest = { ...options };` && |\n| &&
+             `      for (const key of [...TRANSITION_OPTIONS, "rebuild"]) delete rest[key];` && |\n| &&
+             `      return JSON.stringify(` && |\n| &&
+             `        Object.keys(rest)` && |\n| &&
+             `          .sort()` && |\n| &&
+             `          .map((k) => [k, rest[k]]),` && |\n| &&
+             `      );` && |\n| &&
+             `    }` && |\n| &&
+             `` && |\n| &&
+             `    function canKeep(ctx, slotKey, xml, options) {` && |\n| &&
+             `      if (options.rebuild === true) return false;` && |\n| &&
+             `      if (!Lib.isAlive(ViewSlots.getView(ctx, slotKey))) return false;` && |\n| &&
+             `      if (ViewSlots.getViewXml(ctx, slotKey) !== xml) return false;` && |\n| &&
+             `      const recorded = ViewSlots.getViewOptions(ctx, slotKey);` && |\n| &&
+             `      if (!recorded || optionsKey(recorded) !== optionsKey(options)) {` && |\n| &&
+             `        return false;` && |\n| &&
+             `      }` && |\n| &&
+             `` && |\n| &&
+             `      const app = ctx.state.oResponse?.APP;` && |\n| &&
+             `      return Boolean(app) && ViewSlots.getViewApp(ctx, slotKey) === app;` && |\n| &&
+             `    }` && |\n| &&
+             `` && |\n| &&
+             `    function respondsWithDisplay(ctx, slotKey) {` && |\n| &&
+             `      const actions = ctx.state.oResponse?.S_ACTION?.T_SYSTEM;` && |\n| &&
+             `      return (` && |\n| &&
+             `        Array.isArray(actions) &&` && |\n| &&
+             `        actions.some(` && |\n| &&
+             `          (item) =>` && |\n| &&
+             `            Array.isArray(item) &&` && |\n| &&
+             `            item[0] === "VIEW_SLOTS" &&` && |\n| &&
+             `            item[1] === "display" &&` && |\n| &&
+             `            item[2] === slotKey,` && |\n| &&
+             `        )` && |\n| &&
+             `      );` && |\n| &&
+             `    }` && |\n| &&
+             `` && |\n| &&
+             `    function keepMain(ctx, mOptions) {` && |\n| &&
+             `      rememberPlainArrival(ctx, mOptions, true);` && |\n| &&
+             `      for (const key of ["NEST", "NEST2", "POPUP", "POPOVER"]) {` && |\n| &&
+             `        if (!respondsWithDisplay(ctx, key)) ViewSlots.destroy(ctx, key);` && |\n| &&
+             `      }` && |\n| &&
+             `      return true;` && |\n| &&
+             `    }` && |\n| &&
+             `` && |\n| &&
              `    function displayMain(ctx, xml, mOptions, seq) {` && |\n| &&
              `      return chainBuild(ctx, seq, async () => {` && |\n| &&
              `        if (ctx.state.mainTransition) {` && |\n| &&
@@ -480,6 +527,10 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `        ctx.state.mainLeaving?.();` && |\n| &&
              `        const plan = transitionPlan(ctx, mOptions);` && |\n| &&
              `        if (plan) return displayPaged(ctx, xml, mOptions, plan);` && |\n| &&
+             `` && |\n| &&
+             `        if (canKeep(ctx, "MAIN", xml, mOptions) && isSameOwner(ctx, mOptions)) {` && |\n| &&
+             `          return keepMain(ctx, mOptions);` && |\n| &&
+             `        }` && |\n| &&
              `` && |\n| &&
              `        rememberPlainArrival(ctx, mOptions, isSameOwner(ctx, mOptions));` && |\n| &&
              `` && |\n| &&
@@ -516,9 +567,16 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `` && |\n| &&
              `    function displayStandalone(ctx, slotKey, xml, mOptions, seq) {` && |\n| &&
              `      return chainBuild(ctx, seq, () => {` && |\n| &&
+             `        if (` && |\n| &&
+             `          canKeep(ctx, slotKey, xml, mOptions) &&` && |\n| &&
+             `          ViewSlots.getView(ctx, slotKey).isOpen?.() === true` && |\n| &&
+             `        ) {` && |\n| &&
+             `          return undefined;` && |\n| &&
+             `        }` && |\n| &&
              `        ViewSlots.destroy(ctx, slotKey);` && |\n| &&
-             `        if (slotKey === "POPUP") return displayFragment(ctx, xml, seq);` && |\n| &&
-             `        return displayPopover(ctx, xml, mOptions.openById, seq);` && |\n| &&
+             `        if (slotKey === "POPUP")` && |\n| &&
+             `          return displayFragment(ctx, xml, mOptions, seq);` && |\n| &&
+             `        return displayPopover(ctx, xml, mOptions, seq);` && |\n| &&
              `      });` && |\n| &&
              `    }` && |\n| &&
              `` && |\n| &&
@@ -580,12 +638,15 @@ CLASS z2ui5_cl_ui5f_slots_js IMPLEMENTATION.
              `      if (slotKey === "MAIN") {` && |\n| &&
              `        const reusable = { ...options };` && |\n| &&
              `        for (const key of TRANSITION_OPTIONS) delete reusable[key];` && |\n| &&
+             `        delete reusable.rebuild;` && |\n| &&
              `        ctx.state.lastMainDisplayOptions = reusable;` && |\n| &&
              `        return displayMain(ctx, xml, options, seq);` && |\n| &&
              `      }` && |\n| &&
              `      if (slotKey === "POPUP" || slotKey === "POPOVER") {` && |\n| &&
              `        return displayStandalone(ctx, slotKey, xml, options, seq);` && |\n| &&
              `      }` && |\n| &&
+             `` && |\n| &&
+             `      if (canKeep(ctx, slotKey, xml, options)) return undefined;` && |\n| &&
              `      ViewSlots.destroy(ctx, slotKey);` && |\n| &&
              `      return displayNestedView(ctx, xml, slotKey, options, seq);` && |\n| &&
              `    }` && |\n| &&

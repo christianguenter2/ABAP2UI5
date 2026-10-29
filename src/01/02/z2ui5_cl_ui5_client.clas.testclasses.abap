@@ -343,10 +343,12 @@ CLASS ltcl_test_client IMPLEMENTATION.
                                   method_destroy = `removeMidColumnPage` ).
 
     " display after destroy: the display replaces it - the frontend tears
-    " the slot down implicitly, so ONE display action is the whole sequence
+    " the slot down implicitly, so ONE display action is the whole sequence.
+    " It carries `rebuild`: destroy-then-display builds the view anew even
+    " when the frontend shows the same XML already
     cl_abap_unit_assert=>assert_equals(
         exp = `NEST|display|<NestView/>|` &&
-              `{"id":"nest1","methodDestroy":"removeMidColumnPage","methodInsert":"addMidColumnPage"}`
+              `{"id":"nest1","methodDestroy":"removeMidColumnPage","methodInsert":"addMidColumnPage","rebuild":true}`
         act = system_actions( ) ).
 
   ENDMETHOD.

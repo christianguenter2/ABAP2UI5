@@ -38,6 +38,9 @@ CLASS z2ui5_cl_ui5_frontend DEFINITION PUBLIC FINAL CREATE PUBLIC.
     "! separate destroy action travels with it. Displaying a slot twice
     "! queues ONE display, with the last XML. The transition options are the
     "! MAIN view's only: the page change the root sap.m.App animates.
+    "! The frontend keeps a slot that already shows the same XML with the
+    "! same options (actions/Slots canKeep); a destroy of the slot queued
+    "! before the display in the same roundtrip asks for a real rebuild.
     METHODS slot_display
       IMPORTING
         slot                          TYPE clike
@@ -149,6 +152,15 @@ CLASS z2ui5_cl_ui5_frontend DEFINITION PUBLIC FINAL CREATE PUBLIC.
     METHODS slot_reset
       IMPORTING
         slot TYPE clike.
+
+    "! Did the app ask for the slot to be built anew - a destroy queued for
+    "! it, or a display that carried the request already (a second display
+    "! after destroy-then-display must not lose it)?
+    METHODS slot_rebuild_requested
+      IMPORTING
+        slot          TYPE clike
+      RETURNING
+        VALUE(result) TYPE abap_bool.
 
     "! Add an option to the payload, but only when the app set it - an option
     "! that is absent lets the control apply its own default.
@@ -293,12 +305,35 @@ CLASS z2ui5_cl_ui5_frontend IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD slot_rebuild_requested.
+
+    LOOP AT mo_action->ms_next-t_action_front REFERENCE INTO DATA(lr_action) "#EC CI_SORTSEQ
+         WHERE slot = slot.
+      IF lr_action->method = z2ui5_if_ui5_types=>cs_slot_action-destroy.
+        result = abap_true.
+      ELSEIF lr_action->options IS BOUND.
+        result = lr_action->options->get_boolean( `/rebuild` ).
+      ENDIF.
+      IF result = abap_true.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
   METHOD slot_display.
 
     " Whatever was queued for this slot so far is void - the last call
     " decides the slot's state. The teardown of what the slot currently
     " HOLDS is implicit on the frontend (a display replaces the slot), so
-    " no destroy action is queued here.
+    " no destroy action is queued here. A destroy the app queued for this
+    " slot before is not lost, though: destroy-then-display is how an app
+    " asks for the view to be built anew even when its XML is unchanged -
+    " the frontend otherwise keeps a slot that shows the same XML (and with
+    " it the control state no binding holds, which is what such an app
+    " wants to reset).
+    DATA(lv_rebuild) = slot_rebuild_requested( slot ).
     slot_reset( slot ).
 
     TRY.
@@ -324,6 +359,9 @@ CLASS z2ui5_cl_ui5_frontend IMPLEMENTATION.
         set_opt_bool( json = li_opt
                       name = `navBack`
                       val  = nav_back ).
+        set_opt_bool( json = li_opt
+                      name = `rebuild`
+                      val  = lv_rebuild ).
 
         INSERT VALUE #( slot    = slot
                         method  = z2ui5_if_ui5_types=>cs_slot_action-display
