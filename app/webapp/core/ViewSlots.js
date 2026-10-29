@@ -121,7 +121,7 @@ sap.ui.define(
       // in this view without an owner component of its own
       Context.registerView(ctx, view);
       slotXmlStore(ctx)[key] = xml;
-      ctx.state.slotOptions[key] = options ?? {};
+      slotOptionsStore(ctx)[key] = options ?? {};
       // ...and WHICH APP filled it, recorded the same way and for the same
       // reason: a response carries the model of exactly one app, and the
       // slots do not all belong to the same one. An app that is called only
@@ -140,7 +140,11 @@ sap.ui.define(
     // The display options a slot was built with, undefined once it was
     // torn down.
     function getViewOptions(ctx, key) {
-      return ctx.state.slotOptions[key];
+      return slotOptionsStore(ctx)[key];
+    }
+
+    function slotOptionsStore(ctx) {
+      return ctx.state.slotOptions;
     }
 
     // The record lives on the state (so an app restart resets it with
@@ -320,7 +324,7 @@ sap.ui.define(
       // source behind - the developer tools read "is this slot filled" off
       // this record.
       delete slotXmlStore(ctx)[key];
-      delete ctx.state.slotOptions[key];
+      delete slotOptionsStore(ctx)[key];
       delete slotAppStore(ctx)[key];
       const view = ctx.state[slot.prop];
       if (!view) return;
@@ -381,7 +385,7 @@ sap.ui.define(
       if (!slot || !ctx?.state) return undefined;
       for (const dep of slot.dependentSlots ?? []) detach(ctx, dep);
       delete slotXmlStore(ctx)[key];
-      delete ctx.state.slotOptions[key];
+      delete slotOptionsStore(ctx)[key];
       delete slotAppStore(ctx)[key];
       const view = ctx.state[slot.prop];
       if (!view) return undefined;

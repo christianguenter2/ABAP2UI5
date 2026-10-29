@@ -102,7 +102,7 @@ CLASS z2ui5_cl_ui5f_viewslot_js IMPLEMENTATION.
              `` && |\n| &&
              `      Context.registerView(ctx, view);` && |\n| &&
              `      slotXmlStore(ctx)[key] = xml;` && |\n| &&
-             `      ctx.state.slotOptions[key] = options ?? {};` && |\n| &&
+             `      slotOptionsStore(ctx)[key] = options ?? {};` && |\n| &&
              `` && |\n| &&
              `      slotAppStore(ctx)[key] = ctx.state.oResponse?.APP;` && |\n| &&
              `      attachSharedModels(ctx, view);` && |\n| &&
@@ -113,7 +113,11 @@ CLASS z2ui5_cl_ui5f_viewslot_js IMPLEMENTATION.
              `    }` && |\n| &&
              `` && |\n| &&
              `    function getViewOptions(ctx, key) {` && |\n| &&
-             `      return ctx.state.slotOptions[key];` && |\n| &&
+             `      return slotOptionsStore(ctx)[key];` && |\n| &&
+             `    }` && |\n| &&
+             `` && |\n| &&
+             `    function slotOptionsStore(ctx) {` && |\n| &&
+             `      return ctx.state.slotOptions;` && |\n| &&
              `    }` && |\n| &&
              `` && |\n| &&
              `    function slotXmlStore(ctx) {` && |\n| &&
@@ -220,7 +224,7 @@ CLASS z2ui5_cl_ui5f_viewslot_js IMPLEMENTATION.
              `      for (const dep of slot.dependentSlots ?? []) destroy(ctx, dep);` && |\n| &&
              `` && |\n| &&
              `      delete slotXmlStore(ctx)[key];` && |\n| &&
-             `      delete ctx.state.slotOptions[key];` && |\n| &&
+             `      delete slotOptionsStore(ctx)[key];` && |\n| &&
              `      delete slotAppStore(ctx)[key];` && |\n| &&
              `      const view = ctx.state[slot.prop];` && |\n| &&
              `      if (!view) return;` && |\n| &&
@@ -265,7 +269,7 @@ CLASS z2ui5_cl_ui5f_viewslot_js IMPLEMENTATION.
              `      if (!slot || !ctx?.state) return undefined;` && |\n| &&
              `      for (const dep of slot.dependentSlots ?? []) detach(ctx, dep);` && |\n| &&
              `      delete slotXmlStore(ctx)[key];` && |\n| &&
-             `      delete ctx.state.slotOptions[key];` && |\n| &&
+             `      delete slotOptionsStore(ctx)[key];` && |\n| &&
              `      delete slotAppStore(ctx)[key];` && |\n| &&
              `      const view = ctx.state[slot.prop];` && |\n| &&
              `      if (!view) return undefined;` && |\n| &&

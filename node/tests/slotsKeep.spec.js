@@ -190,20 +190,24 @@ test("other XML, other options, another app or a rebuild request build anew", as
   respond("ZCL_APP", ["MAIN"]);
   await Slots.action("display", "MAIN", "<View/>");
 
+  // each step is built anew - one count per step, so a regression names
+  // the branch it is in
   await Slots.action("display", "MAIN", "<View a='1'/>");
+  expect(builds.length, "other XML").toBe(2);
   await Slots.action("display", "MAIN", "<View a='1'/>", {
     switchDefaultModelPath: "/odata/",
   });
+  expect(builds.length, "other options").toBe(3);
   respond("ZCL_OTHER", ["MAIN"]);
   await Slots.action("display", "MAIN", "<View a='1'/>", {
     switchDefaultModelPath: "/odata/",
   });
+  expect(builds.length, "another app").toBe(4);
   await Slots.action("display", "MAIN", "<View a='1'/>", {
     switchDefaultModelPath: "/odata/",
     rebuild: true,
   });
-
-  expect(builds.length).toBe(5);
+  expect(builds.length, "a rebuild request").toBe(5);
   expect(live.MAIN.destroyed).toBe(false);
 });
 
